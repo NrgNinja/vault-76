@@ -1,9 +1,9 @@
 # vault-76
 ## Purpose
 
-This will hold the new implementation of the vault. Entirely in Rust. More details to come.
+This will hold the new implementation of the vault. The new vault, it being the 76th iteration, will generate hashes according to the BLAKE3 hashing function by taking in a 6-8 byte nonce. Once generated, the hashes will be saved in a *[insert data structure to use here]*. Then, they can be sorted in sequential order, and finally written to a file. This implementation is in Rust. More details to come.
 
-##How To Install Rust##
+## How To Install Rust
 
 *If you are on MacOS:*
 
@@ -11,3 +11,8 @@ To download Rustup and install Rust, run the following in your terminal, then fo
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+## About the Authors:
+* Varvara Bondarenko
+* [Renato Diaz](diazrenato2001@outlook.com)
