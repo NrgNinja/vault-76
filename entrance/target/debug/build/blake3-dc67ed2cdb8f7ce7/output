@@ -81,7 +81,11 @@ HOST_ARFLAGS = None
 cargo:rerun-if-env-changed=ARFLAGS
 ARFLAGS = None
 cargo:rustc-link-lib=static=blake3_sse2_sse41_avx2_assembly
+<<<<<<< HEAD
+cargo:rustc-link-search=native=/home/ubuntu/vault-76/entrance/target/debug/build/blake3-dc67ed2cdb8f7ce7/out
+=======
 cargo:rustc-link-search=native=/home/ubuntu/projects/vault-76/entrance/target/debug/build/blake3-dc67ed2cdb8f7ce7/out
+>>>>>>> main
 cargo:rerun-if-env-changed=CARGO_FEATURE_PURE
 cargo:rerun-if-env-changed=CARGO_FEATURE_PREFER_INTRINSICS
 cargo:rustc-cfg=blake3_avx512_ffi
@@ -126,7 +130,11 @@ HOST_ARFLAGS = None
 cargo:rerun-if-env-changed=ARFLAGS
 ARFLAGS = None
 cargo:rustc-link-lib=static=blake3_avx512_assembly
+<<<<<<< HEAD
+cargo:rustc-link-search=native=/home/ubuntu/vault-76/entrance/target/debug/build/blake3-dc67ed2cdb8f7ce7/out
+=======
 cargo:rustc-link-search=native=/home/ubuntu/projects/vault-76/entrance/target/debug/build/blake3-dc67ed2cdb8f7ce7/out
+>>>>>>> main
 cargo:rerun-if-env-changed=CARGO_FEATURE_NEON
 cargo:rerun-if-env-changed=CARGO_FEATURE_NO_NEON
 cargo:rerun-if-env-changed=CARGO_FEATURE_PURE
