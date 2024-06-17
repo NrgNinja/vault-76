@@ -1,0 +1,15 @@
+[package]
+name = "entrance"
+version = "0.1.0"
+authors = ["Varvara Bondarenko <oconnor663@gmail.com>", "Renato Diaz <diazrenato2001@outlook.com>"]
+description = "the vault (76) codebase"
+repository = "https://github.com/NrgNinja/vault-76"
+readme = "README.md"
+edition = "2021"
+
+[features]
+
+
+[dependencies]
+blake3 = "1.5.1"
+clap = "3.1.6"
