@@ -57,15 +57,14 @@ fn main() {
     }
 
     hash_sorter::sort_hashes(&mut hashes);
-    println!("Sorted hashes:");
-    for (nonce, hash) in hashes {
-        println!("Nonce: {} | {}", nonce, hash);
-    }
-
-    // match store_file::store_hashes(&hashes, output_file) {
-    //     Ok(_) => println!("Hashes successfully written to {}", output_file),
-    //     Err(e) => eprintln!("Error writing hashes to file: {}", e),
+    // for (nonce, hash) in hashes {
+    //     println!("Nonce: {} | {}", nonce, hash);
     // }
+
+    match store_file::store_hashes(&hashes, output_file) {
+        Ok(_) => println!("Hashes successfully written to {}", output_file),
+        Err(e) => eprintln!("Error writing hashes to file: {}", e),
+    }
 
     let duration = start.elapsed();
     println!("Generated {} in {:?}", num_nonces, duration);
