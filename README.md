@@ -16,3 +16,11 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## About the Authors:
 * [Varvara Bondarenko](varvara.bondarenko14@gmail.com) 
 * [Renato Diaz](diazrenato2001@outlook.com)
+
+## TODO:
+*include instructions on:* 
+* how to build (ex. all the dependencies needed to run our vault)
+* mention BLAKE3, include links to repo, etc.
+* how to use (commands to generate, store, view, etc.)
+* known bugs
+* etc.
