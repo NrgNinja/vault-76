@@ -15,7 +15,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 ## About the Authors:
 * [Varvara Bondarenko](varvara.bondarenko14@gmail.com) 
-* [Renato Diaz](diazrenato2001@outlook.com)
+* [Renato Diaz](https://www.linkedin.com/in/renato-diaz/)
 
 ## TODO:
 *include instructions on:* 
