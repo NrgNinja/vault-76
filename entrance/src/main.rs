@@ -58,11 +58,11 @@ fn main() {
 
     let output_file = matches.value_of("filename").unwrap_or("main.bin");
 
-    let num_records = matches
+    let num_records_to_print = matches
         .value_of("print")
         .unwrap_or("10")
         .parse::<u64>()
-        .expect("Please provide a valid number for nonces");
+        .expect("Please provide a valid number of records to print");
 
     let mut hashes: Vec<Record> = Vec::new();
 
