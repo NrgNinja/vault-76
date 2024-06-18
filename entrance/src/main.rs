@@ -10,12 +10,12 @@
 #[allow(dead_code)]
 use clap::{App, Arg};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 use std::thread;
+use std::time::Instant;
 
+mod hash_generator;
 mod hash_sorter;
 mod store_file;
-mod hash_generator;
 
 fn main() {
     let matches = App::new("Vault")
@@ -57,13 +57,12 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for threads");
 
-        
     // output file to store binary format of hashes
-    let output_file = matches.value_of("filename").unwrap_or("main.bin");
+    let output_file = matches.value_of("filename").unwrap_or("output.bin");
 
     // shared resource among threads
     let hashes = Arc::new(Mutex::new(Vec::new()));
-        
+
     // vector to hold the thread handles
     let mut handles = vec![];
 
@@ -93,6 +92,8 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
+
+    // TODO: join the vectors together, or sort them independently
 
     // lock the mutex one final time to sort and store hashes
     let mut final_hashes = hashes.lock().unwrap();

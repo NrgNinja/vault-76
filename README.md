@@ -24,3 +24,26 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 * how to use (commands to generate, store, view, etc.)
 * known bugs
 * etc.
+
+## How To Run
+
+First, you have to make sure that you are in the correct directory:
+```bash
+cd entrance
+```
+
+Then, you gotta make sure you have Cargo installed, see [Cargo]:
+
+Make sure to use:
+```bash
+cargo build --release
+```
+To run from `entrance` directory:
+```bash
+cargo run --release -- -n 1000 -t 4
+```
+
+where:
+    -n represents, num of nonces
+    -f represents, output filename // not necessary, default is output.bin
+    -t represents, num of threads
