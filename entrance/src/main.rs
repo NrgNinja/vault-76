@@ -13,7 +13,7 @@ use clap::{App, Arg};
 use std::mem;
 use std::time::Instant;
 
-mod convert_to_hex;
+mod convert_from_binary;
 mod hash_sorter;
 mod store_file;
 
@@ -87,7 +87,7 @@ fn main() {
         Err(e) => eprintln!("Error writing hashes to file: {}", e),
     }
 
-    let _ = convert_to_hex::convert(output_file);
+    let _ = convert_from_binary::convert(output_file);
 
     let duration = start.elapsed();
     println!("Generated {} in {:?}", num_nonces, duration);
