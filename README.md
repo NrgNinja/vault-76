@@ -32,7 +32,7 @@ First, you have to make sure that you are in the correct directory:
 cd entrance
 ```
 
-Then, you gotta make sure you have Cargo installed:
+*Also make sure you have Cargo installed:*
 
 Check that you are able to compile, without actually compiling:
 ```bash
