@@ -36,13 +36,13 @@ fn main() {
                 .takes_value(true) // there must be a filename inputted
                 .help("Output file to store the generated hashes"),
         )
-        // .arg(
-        //     Arg::with_name("print")
-        //         .short('p') // you can change this flag to whatever you want filename to represent
-        //         .long("print")
-        //         .takes_value(true) // there must be a filename inputted
-        //         .help("Number of records to print"),
-        // )
+        .arg(
+            Arg::with_name("print")
+                .short('p') // you can change this flag to whatever you want filename to represent
+                .long("print")
+                .takes_value(true) // there must be a filename inputted
+                .help("Number of records to print"),
+        )
         .arg(
             Arg::with_name("sorting_on")
                 .short('s') // you can change this flag to whatever you want filename to represent
@@ -61,11 +61,11 @@ fn main() {
     let output_file = matches.value_of("filename").unwrap_or("output.bin");
 
     // Define a variable to store the number of hashes that user wants to print
-    // let num_records_to_print = matches
-    //     .value_of("print")
-    //     .unwrap_or("10")
-    //     .parse::<u64>()
-    //     .expect("Please provide a valid number of records to print");
+    let num_records_to_print = matches
+        .value_of("print")
+        .unwrap_or("10")
+        .parse::<u64>()
+        .expect("Please provide a valid number of records to print");
 
     let sorting_on = matches
         .value_of("sorting_on")
@@ -112,7 +112,7 @@ fn main() {
     }
 
     // Calls print_records function to deserialize and print all of the records into command prompt
-    match print_records::print_records(output_file) {
+    match print_records::print_records(output_file, num_records_to_print) {
         Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
         Err(e) => eprintln!("Error deserializing hashes: {}", e),
     }
