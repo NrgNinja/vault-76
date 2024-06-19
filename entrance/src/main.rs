@@ -83,16 +83,14 @@ fn main() {
         let nonce_bytes = (nonce as u64).to_be_bytes();
         let nonce_6_bytes: [u8; NONCE_SIZE] = nonce_bytes[2..8].try_into().unwrap(); // extract the lower 6 bytes as u8 array
 
+        println!("Nonce bytes: {:?}", nonce_6_bytes);
+
         let mut hasher = Hasher::new();
         hasher.update(&nonce_6_bytes); // generate hash
         let hash = hasher.finalize();
         let hash = hash.to_string();
         let hash_slice = &hash[0..HASH_SIZE];
         let hash_slice = String::from(hash_slice);
-
-        // let nonce_hex = hex::encode(&nonce_6_bytes);
-        // let nonce = &nonce_hex[NONCE_SIZE..nonce_hex.len()];
-        // let nonce = String::from(nonce);
 
         hashes.push(Record {
             nonce,
