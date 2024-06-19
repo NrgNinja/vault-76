@@ -42,7 +42,8 @@ sorting functionality is turned on
 ```
 
 ## Additional Libraries Used 
-### Blake3
+### BLAKE3
+Cryptographic hash function. 
 
 ### bincode
 Library used for serialization/deserialization of data structures. 
