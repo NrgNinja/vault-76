@@ -20,7 +20,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## TODO:
 *include instructions on:* 
 * how to build (ex. all the dependencies needed to run our vault)
-  1. Install Rust and Cargo [here](https://www.rust-lang.org/tools/install)
+  1. Install Rust and Cargo [here](https://www.rust-lang.org/tools/install) and [here](https://doc.rust-lang.org/book/ch01-01-installation.html)
   2. Clone repository to your machine. ```git clone https://github.com/NrgNinja/vault-76.git```
   3. Go into project directory -> entrance.
   4. ```cargo run``` 
