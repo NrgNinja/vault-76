@@ -23,7 +23,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   1. Install Rust and Cargo [here](https://www.rust-lang.org/tools/install)
   2. Clone repository to your machine. ```git clone https://github.com/NrgNinja/vault-76.git```
   3. Go into project directory -> entrance.
-  4. ```cargo run```
+  4. ```cargo run``` 
 * mention BLAKE3, include links to repo, etc.
     bincode - library used for serialization/deserialization of data structures. 
     BufReader - improves performance of reading data. Reads larger chunks of data at once. 
