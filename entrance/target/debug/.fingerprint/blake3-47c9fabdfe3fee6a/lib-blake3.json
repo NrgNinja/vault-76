@@ -1,0 +1,1 @@
+{"rustc":18217185010275080438,"features":"[\"default\", \"std\"]","declared_features":"","target":10019531436358441034,"profile":11884874718481939427,"path":9672641731247451565,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"debug/.fingerprint/blake3-47c9fabdfe3fee6a/dep-lib-blake3"}}],"rustflags":[],"metadata":625005834910634608,"config":2202906307356721367,"compile_kind":0}

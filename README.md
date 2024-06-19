@@ -21,6 +21,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 *include instructions on:* 
 * how to build (ex. all the dependencies needed to run our vault)
 * mention BLAKE3, include links to repo, etc.
+    bincode - library used for serialization/deserialization of data structures. 
+    BufReader - improves performance of reading data. Reads larger chunks of data at once. 
 * how to use (commands to generate, store, view, etc.)
 * known bugs
 * etc.
