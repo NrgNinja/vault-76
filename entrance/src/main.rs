@@ -24,14 +24,14 @@ fn main() {
         .about("Generates hashes for specified nonces using BLAKE3")
         .arg(
             Arg::with_name("nonces")
-                .short('n') // you can change this flag to whatever you want nonces to represent
+                .short('n') // you can change this flag
                 .long("nonces")
                 .takes_value(true) // there must be a number inputted
                 .help("Number of nonces to generate hashes for"),
         )
         .arg(
             Arg::with_name("filename")
-                .short('f') // you can change this flag to whatever you want filename to represent
+                .short('f') // you can change this flag
                 .long("filename")
                 .takes_value(true) // there must be a filename inputted
                 .help("Output file to store the generated hashes"),
