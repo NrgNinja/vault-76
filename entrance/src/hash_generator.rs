@@ -28,6 +28,7 @@ pub fn generate_hashes(num_records: u64) -> Vec<Record> {
             hash: hash_slice,
         });
     }
+    println!("{}", hashes.len());
 
     hashes
 }
