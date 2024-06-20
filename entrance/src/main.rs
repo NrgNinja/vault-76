@@ -75,14 +75,12 @@ fn main() {
     // variable to store the number of records to print
     let num_records_to_print = matches
         .value_of("print")
-        .unwrap_or("10")
+        .unwrap_or("")
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
     // output file to store binary format of hashes
-    let output_file = matches
-        .value_of("filename")
-        .unwrap_or("output.bin");
+    let output_file = matches.value_of("filename").unwrap_or("output.bin");
 
     // Defines a variable to check if the sorting mechanism should happen or not
     let sorting_on = matches
@@ -117,9 +115,11 @@ fn main() {
     }
 
     // Calls print_records function to deserialize and print all of the records into command prompt
-    match print_records::print_records(output_file, num_records_to_print) {
-        Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-        Err(e) => eprintln!("Error deserializing hashes: {}", e),
+    if num_records_to_print != 0 {
+        match print_records::print_records(output_file, num_records_to_print) {
+            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+            Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
     }
 
     let duration = start.elapsed();
