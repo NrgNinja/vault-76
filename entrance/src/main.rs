@@ -6,7 +6,7 @@ use std::time::Instant;
 
 mod hash_sorter;
 mod print_records;
-mod store_file;
+mod store_hashes;
 
 const NONCE_SIZE: usize = 6;
 const HASH_SIZE: usize = 26;
@@ -80,13 +80,14 @@ fn main() {
 
     for nonce in 0..num_nonces {
         // convert nonce to 6-byte array
-        let nonce_bytes = (nonce as u64).to_be_bytes();
+        let nonce_bytes = nonce.to_be_bytes();
         let nonce_6_bytes: [u8; NONCE_SIZE] = nonce_bytes[2..8].try_into().unwrap(); // extract the lower 6 bytes as u8 array
 
         println!("Nonce bytes: {:?}", nonce_6_bytes);
 
         let mut hasher = Hasher::new();
-        hasher.update(&nonce_6_bytes); // generate hash
+        hasher.update(b"foo");
+        // hasher.update(&nonce_6_bytes); // generate hash
         let hash = hasher.finalize();
         let hash = hash.to_string();
         let hash_slice = &hash[0..HASH_SIZE];
@@ -104,7 +105,7 @@ fn main() {
     }
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    match store_file::store_hashes(&hashes, output_file) {
+    match store_hashes::store_hashes(&hashes, output_file) {
         Ok(_) => println!("Hashes successfully written to {}", output_file),
         Err(e) => eprintln!("Error writing hashes to file: {}", e),
     }
