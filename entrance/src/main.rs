@@ -75,7 +75,7 @@ fn main() {
     // variable to store the number of records to print
     let num_records_to_print = matches
         .value_of("print")
-        .unwrap_or("")
+        .unwrap_or("0")
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
