@@ -56,12 +56,12 @@ fn main() {
         .parse::<u64>() // parse it into 64 bit unsigned int
         .expect("Please provide a valid number for nonces");
 
-    let output_file = matches.value_of("filename").unwrap_or("output.bin");
+    let output_file = matches.value_of("filename").unwrap_or("");
 
     // Defines a variable to store the number of hashes to print
     let num_records_to_print = matches
         .value_of("print")
-        .unwrap_or("10")
+        .unwrap_or("0")
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
@@ -84,15 +84,19 @@ fn main() {
     }
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    match store_file::store_hashes(&hashes, output_file) {
-        Ok(_) => println!("Hashes successfully written to {}", output_file),
-        Err(e) => eprintln!("Error writing hashes to file: {}", e),
+    if output_file != "" {
+        match store_file::store_hashes(&hashes, output_file) {
+            Ok(_) => println!("Hashes successfully written to {}", output_file),
+            Err(e) => eprintln!("Error writing hashes to file: {}", e),
+        }
     }
 
     // Calls print_records function to deserialize and print all of the records into command prompt
-    match print_records::print_records(output_file, num_records_to_print) {
-        Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-        Err(e) => eprintln!("Error deserializing hashes: {}", e),
+    if num_records_to_print != 0 {
+        match print_records::print_records(output_file, num_records_to_print) {
+            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+            Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
     }
 
     let duration = start.elapsed();

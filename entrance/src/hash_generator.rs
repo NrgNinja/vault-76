@@ -7,7 +7,9 @@ const NONCE_SIZE: usize = 6;
 const HASH_SIZE: usize = 26;
 
 pub fn generate_hashes(num_records: u64) -> Vec<Record> {
-    let mut hashes: Vec<Record> = Vec::new();
+    let capacity = (num_records * 32).try_into().unwrap();
+    let mut hashes: Vec<Record> = Vec::with_capacity(capacity);
+    // let mut hashes: Vec<Record> = Vec::new();
 
     for nonce in 0..num_records {
         // convert nonce to 6-byte array
