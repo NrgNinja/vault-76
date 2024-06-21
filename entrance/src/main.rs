@@ -1,5 +1,6 @@
 // this file will hold the main driver of our vault codebase
 use clap::{App, Arg};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -72,8 +73,6 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for threads");
 
-    let output_file = matches.value_of("filename").unwrap_or("");
-
     // Defines a variable to store the number of hashes to print
     let num_records_to_print = matches
         .value_of("print")
@@ -101,7 +100,7 @@ fn main() {
 
     // generate hashes in parallel
     let start_hash_gen_timer: Instant = Instant::now();
-    
+
     let mut hashes: Vec<Record> = (0..num_records)
         .into_par_iter()
         .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
@@ -124,7 +123,10 @@ fn main() {
     }
 
     let duration = start_vault_timer.elapsed();
-    println!("Generated, sorted, & stored {} records in {:?}", num_records, duration);
+    println!(
+        "Generated, sorted, & stored {} records in {:?}",
+        num_records, duration
+    );
 
     // Calls print_records function to deserialize and print all of the records into command prompt
     match print_records::print_records(output_file, num_records_to_print) {
