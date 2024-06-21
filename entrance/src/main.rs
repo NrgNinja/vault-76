@@ -9,7 +9,9 @@ mod hash_sorter;
 mod print_records;
 mod store_file;
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
+
 struct Record {
     nonce: u64, // nonce is always 6 bytes in size and unique. Represented by an array of u8 6 elements
     hash: String,
@@ -80,9 +82,7 @@ fn main() {
         .expect("Please provide a valid number of records to print");
 
     // output file to store binary format of hashes
-    let output_file = matches
-        .value_of("filename")
-        .unwrap_or("output.bin");
+    let output_file = matches.value_of("filename").unwrap_or("output.bin");
 
     // Defines a variable to check if the sorting mechanism should happen or not
     let sorting_on = matches
@@ -97,13 +97,18 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let start = Instant::now();
+    let start_vault_timer: Instant = Instant::now();
 
     // generate hashes in parallel
+    let start_hash_gen_timer: Instant = Instant::now();
+    
     let mut hashes: Vec<Record> = (0..num_records)
         .into_par_iter()
-        .flat_map(|nonce| hash_generator::generate_hashes(nonce)) // Cast usize to u64 here
+        .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
         .collect();
+
+    let hash_gen_duration = start_hash_gen_timer.elapsed();
+    println!("Generating hashes took {:?}", hash_gen_duration);
 
     // Calls a function that sorts hashes in memory (hash_sorter.rs)
     if sorting_on {
@@ -116,12 +121,12 @@ fn main() {
         Err(e) => eprintln!("Error writing hashes to file: {}", e),
     }
 
+    let duration = start_vault_timer.elapsed();
+    println!("Generated, sorted, & stored {} records in {:?}", num_records, duration);
+
     // Calls print_records function to deserialize and print all of the records into command prompt
     match print_records::print_records(output_file, num_records_to_print) {
         Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
         Err(e) => eprintln!("Error deserializing hashes: {}", e),
     }
-
-    let duration = start.elapsed();
-    println!("Generated {} in {:?}", num_records, duration);
 }
