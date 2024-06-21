@@ -1,7 +1,6 @@
 use bincode::serialize_into;
 use std::fs::File;
 use std::io::{self, BufWriter};
-
 use crate::Record;
 
 // Serializes records into binary and stores them in a file on disk
