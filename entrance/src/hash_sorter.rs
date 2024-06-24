@@ -1,6 +1,7 @@
 use crate::Record;
+use rayon::prelude::*;
 
-// Sorts hashes in memory 
+// sorts hashes in memory using Rayon's parallel unstable sort
 pub fn sort_hashes(hashes: &mut Vec<Record>) {
-    hashes.sort_by(|a, b| a.hash.cmp(&b.hash));
+    hashes.par_sort_unstable_by(|a, b| a.hash.cmp(&b.hash));
 }
