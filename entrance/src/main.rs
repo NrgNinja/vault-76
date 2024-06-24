@@ -23,11 +23,11 @@ fn main() {
         .version("2.0")
         .about("Generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a vector, sort them accordingly, and even look them up efficiently.")
         .arg(
-            Arg::with_name("nonces")
-                .short('n') // you can change this flag
-                .long("nonces")
+            Arg::with_name("k-value")
+                .short('k') // you can change this flag
+                .long("k-value")
                 .takes_value(true) // there must be a number inputted
-                .help("Number of nonces to generate hashes for"),
+                .help("Specify k value to compute 2^k nonces"),
         )
         .arg(
             Arg::with_name("filename")
@@ -60,12 +60,19 @@ fn main() {
         )
         .get_matches();
 
+    let k = matches
+        .value_of("k-value")
+        .unwrap_or("0")
+        .parse::<u32>()
+        .expect("Please provide a valid integer for k");
+
     // Defines a variable to store the number of records to generate
-    let num_records = matches
-        .value_of("nonces")
-        .unwrap_or("10") // default value if none specified
-        .parse::<u64>() // parse it into 64 bit unsigned int
-        .expect("Please provide a valid number for nonces");
+    let num_records = 2u64.pow(k);
+    // matches
+    //     .value_of("nonces")
+    //     .unwrap_or("10") // default value if none specified
+    //     .parse::<u64>() // parse it into 64 bit unsigned int
+    //     .expect("Please provide a valid number for nonces");
 
     let num_threads = matches
         .value_of("threads")
