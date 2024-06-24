@@ -86,28 +86,76 @@
 
 
 // Writes data to disk concurrently and uses BufWriter 
+// use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+// use std::fs::File;
+// use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+
+// use crate::Record;
+
+// // Serializes records into binary and stores them in a file on disk
+// pub fn store_hashes(records: &[Record], filename: &str) -> io::Result<()> {
+//     let file = File::create(filename)?;
+
+//     // Calculate the size of each record
+//     let record_size = std::mem::size_of::<Record>();
+
+//     // Specify chunk size and split records into chunks
+//     let chunk_size = 268435456;
+//     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
+
+//     // Process chunks in parallel
+//     record_chunks
+//         .into_par_iter()
+//         .enumerate()
+//         .try_for_each::<_, io::Result<()>>(|(num_thread, chunk)| {
+//             let mut buffer = Vec::with_capacity(chunk.len() * record_size); // Pre-allocate buffer space
+
+//             for record in chunk {
+//                 buffer.extend_from_slice(&record.nonce);
+//                 buffer.extend_from_slice(&record.hash);
+//             }
+
+//             // Calculate the start position for this chunk
+//             let start_pos = (num_thread * chunk_size) as u64;
+
+//             // Clone the file to create a new BufWriter for each thread
+//             let local_file = file.try_clone()?;
+//             let mut local_writer = BufWriter::new(local_file);
+
+//             // Seek to the correct position and write the buffer
+//             local_writer.seek(SeekFrom::Start(start_pos))?;
+//             local_writer.write_all(&buffer)?;
+//             local_writer.flush()?;
+
+//             Ok(())
+//         })?;
+
+//     Ok(())
+// }
+
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+use std::sync::Arc;
 
 use crate::Record;
 
 // Serializes records into binary and stores them in a file on disk
-pub fn store_hashes(records: &[Record], filename: &str) -> io::Result<()> {
-    let file = File::create(filename)?;
+pub fn store_hashes(records: &[Record], filename: &str, num_threads: &usize) -> io::Result<()> {
+    let file = Arc::new(File::create(filename)?);
 
     // Calculate the size of each record
     let record_size = std::mem::size_of::<Record>();
 
     // Specify chunk size and split records into chunks
-    let chunk_size = 268435456;
+    let chunk_size = (records.len() / num_threads) * 32; 
     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
 
     // Process chunks in parallel
     record_chunks
         .into_par_iter()
         .enumerate()
-        .try_for_each::<_, io::Result<()>>(|(num_thread, chunk)| {
+        .try_for_each::<_, io::Result<()>>(|(chunk_idx, chunk)| {
             let mut buffer = Vec::with_capacity(chunk.len() * record_size); // Pre-allocate buffer space
 
             for record in chunk {
@@ -115,17 +163,17 @@ pub fn store_hashes(records: &[Record], filename: &str) -> io::Result<()> {
                 buffer.extend_from_slice(&record.hash);
             }
 
-            // Calculate the start position for this chunk
-            let start_pos = (num_thread * chunk_size) as u64;
+            let start_pos = (chunk_idx * chunk_size) as u64;
 
-            // Clone the file to create a new BufWriter for each thread
-            let local_file = file.try_clone()?;
-            let mut local_writer = BufWriter::new(local_file);
-
-            // Seek to the correct position and write the buffer
-            local_writer.seek(SeekFrom::Start(start_pos))?;
-            local_writer.write_all(&buffer)?;
-            local_writer.flush()?;
+            let local_file = file.clone();
+            std::thread::spawn(move || {
+                let mut local_writer = BufWriter::new(&*local_file);
+                local_writer.seek(SeekFrom::Start(start_pos)).unwrap();
+                local_writer.write_all(&buffer).unwrap();
+                local_writer.flush().unwrap();
+            })
+            .join()
+            .unwrap();
 
             Ok(())
         })?;
