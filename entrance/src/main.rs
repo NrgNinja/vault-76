@@ -100,7 +100,7 @@ fn main() {
         .expect("Please provide a valid number of records to print");
 
     // output file to store binary format of hashes
-    let output_file = matches.value_of("filename").unwrap_or("output.bin");
+    let output_file = matches.value_of("filename").unwrap_or("");
 
     // Defines a variable to check if the sorting mechanism should happen or not
     let sorting_on = matches
