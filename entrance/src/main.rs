@@ -125,7 +125,7 @@ fn main() {
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if output_file != "" {
-        match store_hashes::store_hashes(&hashes, output_file) {
+        match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
             Ok(_) => println!("Hashes successfully written to {}", output_file),
             Err(e) => eprintln!("Error writing hashes to file: {}", e),
         }
