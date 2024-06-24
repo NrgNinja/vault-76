@@ -14,27 +14,27 @@ mod store_hashes;
 
 struct Record {
     nonce: u64, // nonce is always 6 bytes in size and unique. Represented by an array of u8 6 elements
-    hash: String,
+    hash: [u8; 26],
 }
 
-impl Record {
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
+// impl Record {
+//     fn to_bytes(&self) -> Vec<u8> {
+//         let mut bytes = Vec::new();
 
-        // Convert nonce to bytes and append
-        bytes.extend(&self.nonce.to_le_bytes());
+//         // Convert nonce to bytes and append
+//         bytes.extend(&self.nonce.to_le_bytes());
 
-        // Convert hash to bytes
-        let hash_bytes = self.hash.as_bytes();
-        let hash_length = hash_bytes.len() as u64;
+//         // Convert hash to bytes
+//         let hash_bytes = self.hash.as_bytes();
+//         let hash_length = hash_bytes.len() as u64;
 
-        // Append the length of the hash (as u64) and then the hash bytes
-        bytes.extend(&hash_length.to_le_bytes());
-        bytes.extend(hash_bytes);
+//         // Append the length of the hash (as u64) and then the hash bytes
+//         bytes.extend(&hash_length.to_le_bytes());
+//         bytes.extend(hash_bytes);
 
-        bytes
-    }
-}
+//         bytes
+//     }
+// }
 
 fn main() {
     // defines letters for arguments that the user can call from Command Line
@@ -100,7 +100,7 @@ fn main() {
         .expect("Please provide a valid number of records to print");
 
     // output file to store binary format of hashes
-    let output_file = matches.value_of("filename").unwrap_or("output.bin");
+    let output_file = matches.value_of("filename").unwrap_or("");
 
     // Defines a variable to check if the sorting mechanism should happen or not
     let sorting_on = matches
@@ -136,12 +136,12 @@ fn main() {
     let start_store_output_timer: Instant = Instant::now();
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    if output_file != "" {
-        match store_hashes::store_hashes(&hashes, output_file) {
-            Ok(_) => println!("Hashes successfully written to {}", output_file),
-            Err(e) => eprintln!("Error writing hashes to file: {}", e),
-        }
-    }
+    // if output_file != "" {
+    //     match store_hashes::store_hashes(&hashes, output_file) {
+    //         Ok(_) => println!("Hashes successfully written to {}", output_file),
+    //         Err(e) => eprintln!("Error writing hashes to file: {}", e),
+    //     }
+    // }
     let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     println!("Writing hashes to disk took {:?}", store_output_duration);
 
