@@ -1,4 +1,4 @@
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
@@ -7,25 +7,33 @@ use crate::Record;
 // Serializes records into binary and stores them in a file on disk
 pub fn store_hashes(records: &Vec<Record>, filename: &str) -> io::Result<()> {
     let file = File::create(filename)?;
-    let writer = BufWriter::new(file);
+    let mut writer = BufWriter::new(file);
 
-    // Multi-threaded implementation
-    records.par_iter().try_for_each(|record| {
-        let mut local_writer = BufWriter::new(writer.get_ref().try_clone()?); // each thread creates its own BufWriter instance; each thread has its own `File` handle reference for writing
-        local_writer.write_all(&record.nonce)?;
-        local_writer.write_all(&record.hash)?;
-        local_writer.flush()?;
-        Ok(())
-    })
+    // Specify chunk size and splits records into chunks
+    let chunk_size = 2097152;
+    let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
 
-    // Single-threaded implementation
-    // for record in records {
-    //     let record_bytes = record.to_bytes();
-    //     writer.write_all(&record_bytes)?;
-    //     // serialize_into(&mut writer, record).unwrap();
-    // }
+    // Process chunks in parallel
+    let results: Vec<Vec<u8>> = record_chunks
+        .into_par_iter()
+        .map(|chunk| {
+            let mut buffer = Vec::with_capacity(chunk.len() * (32));
 
-    // writer.flush()?;
+            for record in chunk {
+                buffer.extend_from_slice(&record.nonce);
+                buffer.extend_from_slice(&record.hash);
+            }
 
-    // Ok(())
+            buffer
+        })
+        .collect();
+
+    // Write results sequentially
+    for buffer in results {
+        writer.write_all(&buffer)?;
+    }
+
+    writer.flush()?;
+
+    Ok(())
 }
