@@ -7,7 +7,7 @@ use std::time::Instant;
 mod hash_generator;
 mod hash_sorter;
 mod print_records;
-mod store_file;
+mod store_hashes;
 
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
@@ -15,6 +15,25 @@ mod store_file;
 struct Record {
     nonce: u64, // nonce is always 6 bytes in size and unique. Represented by an array of u8 6 elements
     hash: String,
+}
+
+impl Record {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+
+        // Convert nonce to bytes and append
+        bytes.extend(&self.nonce.to_le_bytes());
+
+        // Convert hash to bytes
+        let hash_bytes = self.hash.as_bytes();
+        let hash_length = hash_bytes.len() as u64;
+
+        // Append the length of the hash (as u64) and then the hash bytes
+        bytes.extend(&hash_length.to_le_bytes());
+        bytes.extend(hash_bytes);
+
+        bytes
+    }
 }
 
 fn main() {
@@ -114,13 +133,17 @@ fn main() {
         hash_sorter::sort_hashes(&mut hashes);
     }
 
+    let start_store_output_timer: Instant = Instant::now();
+
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if output_file != "" {
-        match store_file::store_hashes(&hashes, output_file) {
+        match store_hashes::store_hashes(&hashes, output_file) {
             Ok(_) => println!("Hashes successfully written to {}", output_file),
             Err(e) => eprintln!("Error writing hashes to file: {}", e),
         }
     }
+    let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+    println!("Writing hashes to disk took {:?}", store_output_duration);
 
     let duration = start_vault_timer.elapsed();
     println!(
@@ -129,8 +152,10 @@ fn main() {
     );
 
     // Calls print_records function to deserialize and print all of the records into command prompt
-    match print_records::print_records(output_file, num_records_to_print) {
-        Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-        Err(e) => eprintln!("Error deserializing hashes: {}", e),
+    if num_records_to_print != 0 {
+        match print_records::print_records(output_file, num_records_to_print) {
+            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+            Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
     }
 }
