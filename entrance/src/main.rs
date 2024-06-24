@@ -7,7 +7,7 @@ use std::time::Instant;
 mod hash_generator;
 mod hash_sorter;
 mod print_records;
-mod store_file;
+mod store_hashes;
 
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,7 +137,7 @@ fn main() {
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if output_file != "" {
-        match store_file::store_hashes(&hashes, output_file) {
+        match store_hashes::store_hashes(&hashes, output_file) {
             Ok(_) => println!("Hashes successfully written to {}", output_file),
             Err(e) => eprintln!("Error writing hashes to file: {}", e),
         }
