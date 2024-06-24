@@ -97,22 +97,26 @@ fn main() {
         .unwrap();
 
     let start_vault_timer: Instant = Instant::now();
-
-    // generate hashes in parallel
     let start_hash_gen_timer: Instant = Instant::now();
-
+    
+    // generate hashes in parallel
     let mut hashes: Vec<Record> = (0..num_records)
         .into_par_iter()
         .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
         .collect();
 
     let hash_gen_duration = start_hash_gen_timer.elapsed();
-    println!("Generating hashes took {:?}", hash_gen_duration);
+    println!("Generating {} hashes took {:?}", num_records, hash_gen_duration);
+
+    let sorting_timer: Instant = Instant::now();
 
     // Calls a function that sorts hashes in memory (hash_sorter.rs)
     if sorting_on {
         hash_sorter::sort_hashes(&mut hashes);
     }
+
+    let sorting_finished = sorting_timer.elapsed();
+    println!("Sorting them sequentially takes {:?}", sorting_finished);
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if output_file != "" {
@@ -124,8 +128,8 @@ fn main() {
 
     let duration = start_vault_timer.elapsed();
     println!(
-        "Generated, sorted, & stored {} records in {:?}",
-        num_records, duration
+        "Completed all vault operations in {:?}",
+        duration
     );
 
     // Calls print_records function to deserialize and print all of the records into command prompt
