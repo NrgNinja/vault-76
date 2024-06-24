@@ -127,12 +127,8 @@ fn main() {
     let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     println!("Writing hashes to disk took {:?}", store_output_duration);
 
+    // Final print statement with total duration of the program
     let duration = start_vault_timer.elapsed();
-    // println!(
-    //     "Generated, sorted, & stored {} records in {:?}",
-    //     num_records, duration
-    // );
-
     print!("Generated");
     if sorting_on {
         print!(", sorted");
