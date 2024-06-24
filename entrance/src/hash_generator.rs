@@ -20,7 +20,7 @@ pub fn generate_hash(nonce: u64) -> Record {
     };
 
     Record {
-        nonce: nonce as u64,
+        nonce: nonce_6_bytes,
         hash: hash_slice,
     }
 }
