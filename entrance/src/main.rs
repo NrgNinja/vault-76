@@ -13,28 +13,9 @@ mod store_hashes;
 #[derive(Debug, Serialize, Deserialize)]
 
 struct Record {
-    nonce: u64, // nonce is always 6 bytes in size and unique. Represented by an array of u8 6 elements
+    nonce: [u8; 6], // nonce is always 6 bytes in size and unique. Represented by an array of u8 6 elements
     hash: [u8; 26],
 }
-
-// impl Record {
-//     fn to_bytes(&self) -> Vec<u8> {
-//         let mut bytes = Vec::new();
-
-//         // Convert nonce to bytes and append
-//         bytes.extend(&self.nonce.to_le_bytes());
-
-//         // Convert hash to bytes
-//         let hash_bytes = self.hash.as_bytes();
-//         let hash_length = hash_bytes.len() as u64;
-
-//         // Append the length of the hash (as u64) and then the hash bytes
-//         bytes.extend(&hash_length.to_le_bytes());
-//         bytes.extend(hash_bytes);
-
-//         bytes
-//     }
-// }
 
 fn main() {
     // defines letters for arguments that the user can call from Command Line
@@ -140,20 +121,30 @@ fn main() {
     println!("Sorting them sequentially takes {:?}", sorting_finished);
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    // if output_file != "" {
-    //     match store_hashes::store_hashes(&hashes, output_file) {
-    //         Ok(_) => println!("Hashes successfully written to {}", output_file),
-    //         Err(e) => eprintln!("Error writing hashes to file: {}", e),
-    //     }
-    // }
+    if output_file != "" {
+        match store_hashes::store_hashes(&hashes, output_file) {
+            Ok(_) => println!("Hashes successfully written to {}", output_file),
+            Err(e) => eprintln!("Error writing hashes to file: {}", e),
+        }
+    }
+
     let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     println!("Writing hashes to disk took {:?}", store_output_duration);
 
     let duration = start_vault_timer.elapsed();
-    println!(
-        "Completed all vault operations in {:?}",
-        duration
-    );
+    // println!(
+    //     "Generated, sorted, & stored {} records in {:?}",
+    //     num_records, duration
+    // );
+
+    print!("Generated");
+    if sorting_on {
+        print!(", sorted");
+    }
+    if !output_file.is_empty() {
+        print!(", stored");
+    }
+    println!(" {} records in {:?}", num_records, duration);
 
     // Calls print_records function to deserialize and print all of the records into command prompt
     if num_records_to_print != 0 {
