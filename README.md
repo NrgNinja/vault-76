@@ -74,6 +74,22 @@ cargo run --release -- -h
 cargo clean --release
 ```
 
+## Benchmarking
+1. Build a release executable
+```bash
+cargo build --release
+```
+2. Go to src directory (if you are in the entrance directory):
+```bash
+cd src
+```
+3. Run bash script, specifying parameters
+```bash
+bash run.sh [num_nonces]
+```
+The script first cleans cache, then runs release build with specified parameters. 
+
+
 ## Additional Libraries/Dependencies Used 
 ### BLAKE3
 [Cryptographic hash function. Native to Rust.](https://github.com/BLAKE3-team/BLAKE3) 
