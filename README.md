@@ -45,11 +45,12 @@ cargo check --release
 ```bash
 cargo build --release
 ```
-6. To run the vault with default settings, use this:
-* *output file: `output.bin`*
-* *number of threads to use: 4*
-* *number of records to generate: 10* 
-* *number of records to print: 10*
+6. To run the vault, use this:
+Here are some default settings:
+* *output file: `none, if not specified`*
+* *number of threads to use: 1*
+* *number of hashes to generate: 1* 
+* *number of records to print to command line: 0*
 * *sorting functionality: true (turned on)*
 ```bash
 cargo run --release
@@ -58,18 +59,18 @@ Make sure to include `--` after `--release`, if you plan on using more flags.
 
 ### Example:
 ```bash
-cargo run --release -- -n 33554432 -t 16
+cargo run --release -- -k 25 -t 8 -p 10 -f output.bin
 ```
-*This runs the vault with 16 threads and generates 33554432 records, sorting is on by default, and will be written to output.bin.*
+*This runs vault operations with `8` threads and generates 2^k records, where k is `25` (so 33554432  records). Sorting is on (`true`) by default, and will be written to the output file specified `output.bin`. Finally, `10` records will be printed to the command line.*
 
 6. To see what flags can be customized:
 ```bash
 cargo run --release -- -h
 ```
 
-7. To clean wipe your build (in case of any issues):
+7. To clean wipe your build:
 
-*Be sure to remove generated files every once in a while or else it might start breaking your computer:*
+*Be sure to remove generated files every once in a while to clean cache and start fresh in case of any issues*
 ```bash
 cargo clean --release
 ```
@@ -103,16 +104,21 @@ The script first cleans cache, then runs release build with specified parameters
 ### BufReader
 [Improves performance of reading data. Reads larger chunks of data at once.](https://doc.rust-lang.org/std/io/struct.BufReader.html) 
 
+### Arc
+[Enables data sharing among multiple threads.](https://doc.rust-lang.org/std/sync/struct.Arc.html)
+
+### Mutex
+[Allows multiple threads to access a shared resource while ensuring that only one thread can access it at a time.](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
+
 ## Known Bugs
-* It's too slow rn, we're working on making it faster lol. There might be an issue with how we're generating & storing hashes.
+* In comparison to the OG Vault, it is still not fast enough. We suspect it may have to do with the generation of hashes, and are trying new approaches to make it faster. But in terms of code neatness and readability, it is much easier to understand in this Rust codebase.
+* All vault operations seem to run slower when asked to print records, although printing isn't accounted into the timers. 
+* We are thinking of using a DashMap for parallel insertions of our hashes. 
 
 ## TODO:
-*include instructions on:* 
-* how to build (ex. all the dependencies needed to run our vault) 
-* mention BLAKE3, include links to repo, etc.
-* how to use (commands to generate, store, view, etc.)
-* known bugs
-* etc.
+* keep README up to date 
+* implement caching layer with NVMe + HDD solutions
+* explore lossy/lossless compression techniques
 
 ## About the Authors:
 * [Varvara Bondarenko](varvara.bondarenko14@gmail.com) 

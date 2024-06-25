@@ -1,4 +1,4 @@
-// this file will hold the main driver of our vault codebase
+// this file holds the main driver of our vault codebase
 use clap::{App, Arg};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -66,13 +66,7 @@ fn main() {
         .parse::<u32>()
         .expect("Please provide a valid integer for k");
 
-    // Defines a variable to store the number of records to generate
     let num_records = 2u64.pow(k);
-    // matches
-    //     .value_of("nonces")
-    //     .unwrap_or("10") // default value if none specified
-    //     .parse::<u64>() // parse it into 64 bit unsigned int
-    //     .expect("Please provide a valid number for nonces");
 
     let num_threads = matches
         .value_of("threads")
@@ -86,7 +80,6 @@ fn main() {
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
-    // output file to store binary format of hashes
     let output_file = matches.value_of("filename").unwrap_or("");
 
     let sorting_on = matches

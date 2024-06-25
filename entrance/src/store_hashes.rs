@@ -1,4 +1,4 @@
-// Writes data to disk sequentially 
+// Writes data to disk sequentially
 
 // use rayon::iter::{IntoParallelIterator, ParallelIterator};
 // use std::fs::File;
@@ -41,8 +41,6 @@
 //     Ok(())
 // }
 
-
-
 // Uses mutex and locks
 
 // use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
@@ -84,8 +82,7 @@
 //     Ok(())
 // }
 
-
-// Writes data to disk concurrently and uses BufWriter 
+// Writes data to disk concurrently and uses BufWriter
 // use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 // use std::fs::File;
 // use std::io::{self, BufWriter, Seek, SeekFrom, Write};
@@ -148,7 +145,7 @@ pub fn store_hashes(records: &[Record], filename: &str, num_threads: &usize) -> 
     let record_size = std::mem::size_of::<Record>();
 
     // Specify chunk size and split records into chunks
-    let chunk_size = (records.len() / num_threads) * 32; 
+    let chunk_size = (records.len() / num_threads) * 32;
     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
 
     // Process chunks in parallel
