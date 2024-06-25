@@ -13,12 +13,12 @@ mod store_hashes;
 #[derive(Debug, Serialize, Deserialize)]
 
 struct Record {
-    nonce: [u8; 6], // nonce is always 6 bytes in size and unique. Represented by an array of u8 6 elements
+    nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
     hash: [u8; 26],
 }
 
 fn main() {
-    // defines letters for arguments that the user can call from Command Line
+    // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault")
         .version("2.0")
         .about("Generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a vector, sort them accordingly, and even look them up efficiently.")
@@ -31,31 +31,31 @@ fn main() {
         )
         .arg(
             Arg::with_name("filename")
-                .short('f') // you can change this flag
+                .short('f')
                 .long("filename")
-                .takes_value(true) // there must be a filename inputted
+                .takes_value(true)
                 .help("Output file to store the generated hashes"),
         )
         .arg(
             Arg::with_name("print")
-                .short('p') // you can change this flag to whatever you want filename to represent
+                .short('p')
                 .long("print")
-                .takes_value(true) // there must be a filename inputted
+                .takes_value(true)
                 .help("Number of records to print"),
         )
         .arg(
             Arg::with_name("sorting_on")
-                .short('s') // you can change this flag to whatever you want filename to represent
+                .short('s')
                 .long("sorting_on")
-                .takes_value(true) // there must be a filename inputted
+                .takes_value(true)
                 .help("Turn sorting on/off"),
         )
         .arg(
             Arg::with_name("threads")
-                .short('t') // cmd line flag
+                .short('t')
                 .long("threads")
                 .takes_value(true)
-                .default_value("1") // there must be threads specified
+                .default_value("1") 
                 .help("Number of threads to use for hash generation"),
         )
         .get_matches();
@@ -80,7 +80,6 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for threads");
 
-    // Defines a variable to store the number of hashes to print
     let num_records_to_print = matches
         .value_of("print")
         .unwrap_or("0")
@@ -90,7 +89,6 @@ fn main() {
     // output file to store binary format of hashes
     let output_file = matches.value_of("filename").unwrap_or("");
 
-    // Defines a variable to check if the sorting mechanism should happen or not
     let sorting_on = matches
         .value_of("sorting_on")
         .unwrap_or("true")
@@ -104,26 +102,31 @@ fn main() {
         .unwrap();
 
     let start_vault_timer: Instant = Instant::now();
-
-    // generate hashes in parallel
     let start_hash_gen_timer: Instant = Instant::now();
 
+    // generate hashes in parallel (if using multiple threads)
     let mut hashes: Vec<Record> = (0..num_records)
         .into_par_iter()
         .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
         .collect();
 
     let hash_gen_duration = start_hash_gen_timer.elapsed();
-    println!("Generating hashes took {:?}", hash_gen_duration);
+    println!(
+        "Generating {} hashes took {:?}",
+        num_records, hash_gen_duration
+    );
 
-    // Calls a function that sorts hashes in memory (hash_sorter.rs)
+    let sorting_timer: Instant = Instant::now();
+
     if sorting_on {
         hash_sorter::sort_hashes(&mut hashes);
     }
 
     let start_store_output_timer: Instant = Instant::now();
 
-    // Calls store_hashes function to serialize generated hashes into binary and store them on disk
+    let sorting_finished = sorting_timer.elapsed();
+    println!("Sorting them sequentially takes {:?}", sorting_finished);
+
     if output_file != "" {
         match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
             Ok(_) => println!("Hashes successfully written to {}", output_file),
@@ -134,7 +137,6 @@ fn main() {
     let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     println!("Writing hashes to disk took {:?}", store_output_duration);
 
-    // Final print statement with total duration of the program
     let duration = start_vault_timer.elapsed();
     print!("Generated");
     if sorting_on {
@@ -145,7 +147,6 @@ fn main() {
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    // Calls print_records function to deserialize and print all of the records into command prompt
     if num_records_to_print != 0 {
         match print_records::print_records(output_file, num_records_to_print) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
