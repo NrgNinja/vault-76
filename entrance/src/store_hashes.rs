@@ -4,16 +4,16 @@ use std::io::{self, BufWriter, Write};
 
 use crate::Record;
 
-// Serializes records into binary and stores them in a file on disk
+// function to serialize generated hashes into binary and store them on disk
 pub fn store_hashes(records: &Vec<Record>, filename: &str) -> io::Result<()> {
     let file = File::create(filename)?;
     let mut writer = BufWriter::new(file);
 
-    // Specify chunk size and splits records into chunks
+    // specify chunk size and splits records into chunks
     let chunk_size = 2097152;
     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
 
-    // Process chunks in parallel
+    // process chunks in parallel
     let results: Vec<Vec<u8>> = record_chunks
         .into_par_iter()
         .map(|chunk| {
@@ -28,7 +28,7 @@ pub fn store_hashes(records: &Vec<Record>, filename: &str) -> io::Result<()> {
         })
         .collect();
 
-    // Write results sequentially
+    // write results sequentially
     for buffer in results {
         writer.write_all(&buffer)?;
     }

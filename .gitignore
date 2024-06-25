@@ -2,4 +2,5 @@ entrance/target/release/
 entrance/target/debug/
 entrance/target/
 Cargo.lock
+entrance/output.bin
 entrance/src/output.bin
