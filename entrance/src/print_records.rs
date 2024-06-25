@@ -12,7 +12,10 @@ fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
 }
 
 fn hash_to_string(hash: &[u8; 26]) -> String {
-    hash.iter().map(|b| format!("{:02x}", b)).collect::<Vec<String>>().join("")
+    hash.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<String>>()
+        .join("")
 }
 
 // function to deserialize and print all of the records into command line
