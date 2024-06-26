@@ -1,5 +1,7 @@
+use blake3::Hasher;
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
+use dashmap::DashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -105,13 +107,43 @@ fn main() {
     //     .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
     //     .collect();
 
+    let buckets: DashMap<u64, Vec<(u64, u64)>> = DashMap::with_capacity(num_threads as usize);
+
+    let prefix_length = 7;
+
+    // let hashes = (0..num_threads).into_par_iter().flat_map(|prefix| ).collect();
+
+    (0..num_records).into_par_iter().for_each(|nonce| {
+        let mut hasher = Hasher::new();
+
+        // let nonce: [u8; 6] = nonce.to_be_bytes()[2..8].try_into().unwrap();
+
+        hasher.update(&nonce.to_le_bytes());
+        let hash = hasher.finalize();
+
+        // let hash_slice = {
+        //     let mut bytes = [0u8; 26];
+        //     bytes.copy_from_slice(&hash.as_bytes()[..26]);
+        //     bytes
+        // };
+
+        let key = extract_prefix(&hash, prefix_length);
+
+        // let record = Record {
+        //     nonce,
+        //     hash: hash_slice,
+        // };
+
+        buckets.entry(key).or_insert_with(Vec::new).push((key, nonce as u64));
+    });
+
     // num_threads corresponds to num_buckets
-    let mut hashes: Vec<Record> = (0..num_threads)
-        .into_par_iter()
-        .flat_map(|bucket_index| {
-            hash_generator::generate_hash_bucket(bucket_index as usize, bucket_size)
-        })
-        .collect();
+    // let mut hashes: Vec<Record> = (0..num_threads)
+    //     .into_par_iter()
+    //     .flat_map(|bucket_index| {
+    //         hash_generator::generate_hash_bucket(bucket_index as usize, bucket_size)
+    //     })
+    //     .collect();
 
     let hash_gen_duration: std::time::Duration = start_hash_gen_timer.elapsed();
     println!(
@@ -119,25 +151,25 @@ fn main() {
         num_records, hash_gen_duration
     );
 
-    let start_hash_sort_timer: Instant = Instant::now();
-
     // Calls a function that sorts hashes in memory (hash_sorter.rs)
-    if sorting_on {
-        hash_sorter::sort_hashes(&mut hashes);
-    }
+    // if sorting_on {
+    //     let start_hash_sort_timer: Instant = Instant::now();
 
-    let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
-    println!("Sorting hashes took {:?}", hash_sort_duration);
+    //     hash_sorter::sort_hashes(&mut hashes);
+
+    //     let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
+    //     println!("Sorting hashes took {:?}", hash_sort_duration);
+    // }
 
     let start_store_output_timer: Instant = Instant::now();
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    if output_file != "" {
-        match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
-            Ok(_) => println!("Hashes successfully written to {}", output_file),
-            Err(e) => eprintln!("Error writing hashes to file: {}", e),
-        }
-    }
+    // if output_file != "" {
+    //     match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
+    //         Ok(_) => println!("Hashes successfully written to {}", output_file),
+    //         Err(e) => eprintln!("Error writing hashes to file: {}", e),
+    //     }
+    // }
 
     let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     println!("Writing hashes to disk took {:?}", store_output_duration);
@@ -158,4 +190,13 @@ fn main() {
             Err(e) => eprintln!("Error deserializing hashes: {}", e),
         }
     }
+}
+
+fn extract_prefix(hash: &blake3::Hash, length: usize) -> u64 {
+    let mut prefix = 0;
+    let bytes = hash.as_bytes();
+    for i in 0..std::cmp::min(length, bytes.len()) {
+        prefix |= (bytes[i] as u64) << (i * 8);
+    }
+    prefix
 }

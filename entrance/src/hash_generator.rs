@@ -1,6 +1,7 @@
 // this file stores the hash generation process of the vault
 use crate::Record;
 use blake3::Hasher;
+use rayon::prelude::*;
 
 const NONCE_SIZE: usize = 6;
 const HASH_SIZE: usize = 26;
@@ -28,13 +29,14 @@ const HASH_SIZE: usize = 26;
 // Generate hashes in buckets and compare them based on prefix
 pub fn generate_hash_bucket(bucket_index: usize, bucket_size: usize) -> Vec<Record> {
     let mut bucket = Vec::with_capacity(bucket_size);
+    let start_nonce = (bucket_index * bucket_size) as u64;
 
-    for nonce in (bucket_index * bucket_size)..((bucket_index + 1) * bucket_size) {
-        let nonce_bytes = nonce.to_be_bytes();
-        let nonce_6_bytes: [u8; NONCE_SIZE] = nonce_bytes[2..8].try_into().unwrap();
+    for i in 0..bucket_size {
+        let current_nonce = start_nonce + i as u64;
+        let nonce_bytes: [u8; NONCE_SIZE] = current_nonce.to_be_bytes()[2..8].try_into().unwrap(); // directly get the slice
 
         let mut hasher = Hasher::new();
-        hasher.update(&nonce_6_bytes);
+        hasher.update(&nonce_bytes);
         let hash = hasher.finalize();
         let hash_slice = {
             let mut bytes = [0u8; HASH_SIZE];
@@ -43,12 +45,13 @@ pub fn generate_hash_bucket(bucket_index: usize, bucket_size: usize) -> Vec<Reco
         };
 
         let record = Record {
-            nonce: nonce_6_bytes,
+            nonce: nonce_bytes,
             hash: hash_slice,
         };
 
         bucket.push(record);
     }
+    // bucket.par_sort_unstable_by(|a, b| a.hash.cmp(&b.hash));
 
     bucket
 }
