@@ -130,50 +130,71 @@
 //     Ok(())
 // }
 
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::fs::File;
-use std::io::{self, BufWriter, Seek, SeekFrom, Write};
-use std::sync::Arc;
+// use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+// use std::fs::File;
+// use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+// use std::sync::Arc;
+
+// use crate::Record;
+
+// // Serializes records into binary and stores them in a file on disk
+// pub fn store_hashes(records: &[Record], filename: &str, num_threads: &usize) -> io::Result<()> {
+//     let file = Arc::new(File::create(filename)?);
+
+//     // Calculate the size of each record
+//     let record_size = std::mem::size_of::<Record>();
+
+//     // Specify chunk size and split records into chunks
+//     let chunk_size = (records.len() / num_threads) * 32;
+//     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
+
+//     // Process chunks in parallel
+//     record_chunks
+//         .into_par_iter()
+//         .enumerate()
+//         .try_for_each::<_, io::Result<()>>(|(chunk_idx, chunk)| {
+//             let mut buffer = Vec::with_capacity(chunk.len() * record_size); // Pre-allocate buffer space
+
+//             for record in chunk {
+//                 buffer.extend_from_slice(&record.nonce);
+//                 buffer.extend_from_slice(&record.hash);
+//             }
+
+//             let start_pos = (chunk_idx * chunk_size) as u64;
+
+//             let local_file = file.clone();
+//             std::thread::spawn(move || {
+//                 let mut local_writer = BufWriter::new(&*local_file);
+//                 local_writer.seek(SeekFrom::Start(start_pos)).unwrap();
+//                 local_writer.write_all(&buffer).unwrap();
+//                 local_writer.flush().unwrap();
+//             })
+//             .join()
+//             .unwrap();
+
+//             Ok(())
+//         })?;
+
+//     Ok(())
+// }
 
 use crate::Record;
+use dashmap::DashMap;
+use std::fs::File;
+use std::io::{BufWriter, Result, Write};
 
-// Serializes records into binary and stores them in a file on disk
-pub fn store_hashes(records: &[Record], filename: &str, num_threads: &usize) -> io::Result<()> {
-    let file = Arc::new(File::create(filename)?);
+// Function to serialize and store records from a DashMap into a binary file
+pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> Result<()> {
+    let file = File::create(filename)?;
+    let mut writer = BufWriter::new(file);
 
-    // Calculate the size of each record
-    let record_size = std::mem::size_of::<Record>();
+    for record_vec in map.iter() {
+        for record in record_vec.value() {
+            writer.write_all(&record.nonce)?;
+            writer.write_all(&record.hash)?;
+        }
+    }
 
-    // Specify chunk size and split records into chunks
-    let chunk_size = (records.len() / num_threads) * 32;
-    let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
-
-    // Process chunks in parallel
-    record_chunks
-        .into_par_iter()
-        .enumerate()
-        .try_for_each::<_, io::Result<()>>(|(chunk_idx, chunk)| {
-            let mut buffer = Vec::with_capacity(chunk.len() * record_size); // Pre-allocate buffer space
-
-            for record in chunk {
-                buffer.extend_from_slice(&record.nonce);
-                buffer.extend_from_slice(&record.hash);
-            }
-
-            let start_pos = (chunk_idx * chunk_size) as u64;
-
-            let local_file = file.clone();
-            std::thread::spawn(move || {
-                let mut local_writer = BufWriter::new(&*local_file);
-                local_writer.seek(SeekFrom::Start(start_pos)).unwrap();
-                local_writer.write_all(&buffer).unwrap();
-                local_writer.flush().unwrap();
-            })
-            .join()
-            .unwrap();
-
-            Ok(())
-        })?;
-
+    writer.flush()?;
     Ok(())
 }
