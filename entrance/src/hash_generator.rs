@@ -1,4 +1,4 @@
-// this file will store the hash generation process of the vault
+// this file stores the hash generation process of the vault
 use crate::Record;
 use blake3::Hasher;
 
@@ -71,6 +71,7 @@ pub fn generate_hash_batch(start_nonce: u64, batch_size: u64) -> Vec<(u64, [u8; 
     results
 }
 
+// multi-threaded approach - string
 // multi-threaded approach - string
 // pub fn generate_hash(nonce: u64) -> Record {
 //     let nonce_bytes = (nonce).to_be_bytes();
