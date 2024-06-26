@@ -47,7 +47,7 @@ cargo build --release
 ```
 6. To run the vault, use this:
 Here are some default settings:
-* *output file: `none, if not specified`*
+* *output file: `none` (if not specified)*
 * *number of threads to use: `1`*
 * *number of hashes to generate: `1`* 
 * *number of records to print to command line: `0`*
