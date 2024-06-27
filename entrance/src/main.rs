@@ -117,18 +117,16 @@ fn main() {
 
     }
 
-    let start_store_output_timer: Instant = Instant::now();
-
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if output_file != "" {
+        let start_store_output_timer: Instant = Instant::now();
         match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
             Ok(_) => println!("Hashes successfully written to {}", output_file),
             Err(e) => eprintln!("Error writing hashes to file: {}", e),
         }
+        let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+        println!("Writing hashes to disk took {:?}", store_output_duration);
     }
-
-    let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-    println!("Writing hashes to disk took {:?}", store_output_duration);
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
