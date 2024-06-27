@@ -1,6 +1,5 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
-use hash_generator::{generate_hash_bucket, generate_hash_batch};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -89,8 +88,6 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
 
-    let bucket_size: usize = ((num_records as usize) / num_threads) * 32;
-
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
@@ -100,27 +97,10 @@ fn main() {
     let start_vault_timer: Instant = Instant::now();
     let start_hash_gen_timer: Instant = Instant::now();
 
-    // let mut hashes: Vec<Record> = (0..num_records)
-    //     .into_par_iter()
-    //     .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
-    //     .collect();
-
-    // num_threads corresponds to num_buckets
-    let mut hashes: Vec<Record> = (0..num_threads)
+    let mut hashes: Vec<Record> = (0..num_records)
         .into_par_iter()
-        .flat_map(|bucket_index| generate_hash_bucket(bucket_index, bucket_size))
+        .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
         .collect();
-
-    // let num_batches = (num_records + 1000 - 1) / 1000; // Round up to cover all nonces
-
-    // let mut hashes: Vec<(u64, [u8; 26])> = (0..num_batches)
-    //     .into_par_iter()
-    //     .flat_map(|batch_index| {
-    //         let start_nonce = batch_index * 1000;
-    //         let end_nonce = (start_nonce + 1000).min(num_records);
-    //         generate_hash_batch(start_nonce, end_nonce - start_nonce)
-    //     })
-    //     .collect();
 
     let hash_gen_duration = start_hash_gen_timer.elapsed();
     println!(
@@ -129,19 +109,23 @@ fn main() {
     );
 
     // Calls a function that sorts hashes in memory (hash_sorter.rs)
-    // if sorting_on {
-    //     hash_sorter::sort_hashes(&mut hashes);
-    // }
+    if sorting_on {
+        let start_hash_sort_timer: Instant = Instant::now();
+        hash_sorter::sort_hashes(&mut hashes);
+        let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
+        println!("Sorting hashes took {:?}", hash_sort_duration);
+
+    }
 
     let start_store_output_timer: Instant = Instant::now();
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    // if output_file != "" {
-    //     match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
-    //         Ok(_) => println!("Hashes successfully written to {}", output_file),
-    //         Err(e) => eprintln!("Error writing hashes to file: {}", e),
-    //     }
-    // }
+    if output_file != "" {
+        match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
+            Ok(_) => println!("Hashes successfully written to {}", output_file),
+            Err(e) => eprintln!("Error writing hashes to file: {}", e),
+        }
+    }
 
     let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     println!("Writing hashes to disk took {:?}", store_output_duration);
