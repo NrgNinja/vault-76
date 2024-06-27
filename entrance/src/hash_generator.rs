@@ -1,10 +1,6 @@
 // this file stores the hash generation process of the vault
-use crate::Record;
+use crate::{Record, HASH_SIZE, NONCE_SIZE, PREFIX_LENGTH};
 use blake3::Hasher;
-use rayon::prelude::*;
-
-const NONCE_SIZE: usize = 6;
-const HASH_SIZE: usize = 26;
 
 // multi-threaded approach - bytes
 // pub fn generate_hash(nonce: u64) -> Record {
@@ -29,11 +25,10 @@ const HASH_SIZE: usize = 26;
 // Generate hashes in buckets and compare them based on prefix
 pub fn generate_hash_bucket(bucket_index: usize, bucket_size: usize) -> Vec<Record> {
     let mut bucket = Vec::with_capacity(bucket_size);
-    let start_nonce = (bucket_index * bucket_size) as u64;
+    let start_nonce = 
 
-    for i in 0..bucket_size {
-        let current_nonce = start_nonce + i as u64;
-        let nonce_bytes: [u8; NONCE_SIZE] = current_nonce.to_be_bytes()[2..8].try_into().unwrap(); // directly get the slice
+    for nonce in 0..bucket_size {
+        let nonce_bytes: [u8; NONCE_SIZE] = nonce.to_be_bytes()[2..8].try_into().unwrap(); // directly get the slice
 
         let mut hasher = Hasher::new();
         hasher.update(&nonce_bytes);
@@ -50,13 +45,10 @@ pub fn generate_hash_bucket(bucket_index: usize, bucket_size: usize) -> Vec<Reco
         };
 
         bucket.push(record);
-    }
-    // bucket.par_sort_unstable_by(|a, b| a.hash.cmp(&b.hash));
-
+    };
     bucket
 }
 
-// multi-threaded approach - string
 // multi-threaded approach - string
 // pub fn generate_hash(nonce: u64) -> Record {
 //     let nonce_bytes = (nonce).to_be_bytes();
