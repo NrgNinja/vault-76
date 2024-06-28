@@ -17,7 +17,8 @@ struct Record {
     hash: [u8; 26],
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault")
         .version("2.0")
@@ -118,9 +119,9 @@ fn main() {
     }
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    if output_file != "" {
+    if !output_file.is_empty() {
         let start_store_output_timer: Instant = Instant::now();
-        match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
+        match store_hashes::store_hashes(&hashes, output_file, &num_threads).await {
             Ok(_) => println!("Hashes successfully written to {}", output_file),
             Err(e) => eprintln!("Error writing hashes to file: {}", e),
         }
