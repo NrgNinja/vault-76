@@ -16,7 +16,7 @@ struct Record {
     hash: [u8; HASH_SIZE],
 }
 
-pub const PREFIX_LENGTH: usize = 4;
+pub const PREFIX_LENGTH: usize = 6;
 pub const NONCE_SIZE: usize = 6;
 pub const HASH_SIZE: usize = 26;
 
@@ -112,7 +112,14 @@ fn main() {
     let mut hashes: Vec<Record> = (0..num_threads)
         .into_par_iter()
         .flat_map(|bucket_index| {
-            hash_generator::generate_hash_bucket(bucket_index, bucket_size)
+            let mut bucket_index: i32 = 1;
+            println!("{}", bucket_index);
+            let prefix: [u8; PREFIX_LENGTH] = bucket_index.to_be_bytes()[0..PREFIX_LENGTH].try_into().unwrap();
+            println!("{:?}", prefix);
+            let bucket = hash_generator::generate_hash_bucket(bucket_index as usize, bucket_size, prefix);
+            bucket_index += 1;
+            println!("{}", bucket_index);
+            bucket
         })
         .collect();
 

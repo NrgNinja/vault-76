@@ -2,5 +2,5 @@ free > /dev/null && sync > /dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_c
 sleep 5
 k="$1"
 cd .. 
-./target/release/entrance -k $k -t 16 -f output.bin -s true
+./target/release/entrance -k $k -t 16 -f output.bin -s true -p 10
 # cargo run --release -- -k $k -t 16

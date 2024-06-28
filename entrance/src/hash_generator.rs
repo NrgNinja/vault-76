@@ -23,12 +23,17 @@ use blake3::Hasher;
 // }
 
 // Generate hashes in buckets and compare them based on prefix
-pub fn generate_hash_bucket(bucket_index: usize, bucket_size: usize) -> Vec<Record> {
+pub fn generate_hash_bucket(
+    bucket_index: usize,
+    bucket_size: usize,
+    prefix: [u8; PREFIX_LENGTH],
+) -> Vec<Record> {
     let mut bucket = Vec::with_capacity(bucket_size);
-    let start_nonce = 
+    let nonce = bucket_size * bucket_index;
+    // let end_nonce = bucket_size * (bucket_index + 1);
 
-    for nonce in 0..bucket_size {
-        let nonce_bytes: [u8; NONCE_SIZE] = nonce.to_be_bytes()[2..8].try_into().unwrap(); // directly get the slice
+    while bucket.len() != bucket_size {
+        let nonce_bytes: [u8; NONCE_SIZE] = nonce.to_be_bytes()[2..8].try_into().unwrap();
 
         let mut hasher = Hasher::new();
         hasher.update(&nonce_bytes);
@@ -39,13 +44,37 @@ pub fn generate_hash_bucket(bucket_index: usize, bucket_size: usize) -> Vec<Reco
             bytes
         };
 
-        let record = Record {
-            nonce: nonce_bytes,
-            hash: hash_slice,
-        };
+        println!("{:?}", prefix);
 
-        bucket.push(record);
-    };
+        if hash_slice[0..PREFIX_LENGTH] == prefix {
+            let record = Record {
+                nonce: nonce_bytes,
+                hash: hash_slice,
+            };
+
+            bucket.push(record);
+        }
+    }
+
+    // for nonce in start_nonce..end_nonce {
+    //     let nonce_bytes: [u8; NONCE_SIZE] = nonce.to_be_bytes()[2..8].try_into().unwrap(); // directly get the slice
+
+    //     let mut hasher = Hasher::new();
+    //     hasher.update(&nonce_bytes);
+    //     let hash = hasher.finalize();
+    //     let hash_slice = {
+    //         let mut bytes = [0u8; HASH_SIZE];
+    //         bytes.copy_from_slice(&hash.as_bytes()[..HASH_SIZE]);
+    //         bytes
+    //     };
+
+    //     let record = Record {
+    //         nonce: nonce_bytes,
+    //         hash: hash_slice,
+    //     };
+
+    //     bucket.push(record);
+    // }
     bucket
 }
 
