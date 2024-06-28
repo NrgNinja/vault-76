@@ -79,31 +79,8 @@ use std::convert::TryInto;
 
 const NONCE_SIZE: usize = 6;
 const HASH_SIZE: usize = 26;
-// const PREFIX_SIZE: usize = 12; // This should be configurable as per your requirements
 
-// pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
-//     let nonce_bytes = nonce.to_be_bytes();
-//     let nonce_6_bytes: [u8; NONCE_SIZE] = nonce_bytes[2..8].try_into().unwrap();
-
-//     let mut hasher = Hasher::new();
-//     hasher.update(&nonce_6_bytes);
-//     let hash = hasher.finalize();
-//     let hash_bytes = hash.as_bytes();
-//     let hash_slice: [u8; HASH_SIZE] = hash_bytes[0..HASH_SIZE].try_into().unwrap();
-
-//     let prefix = hash_bytes[0..PREFIX_SIZE.min(prefix_length)]
-//         .iter()
-//         .fold(0u64, |acc, &b| (acc << 8) | b as u64);
-
-//     (
-//         prefix,
-//         Record {
-//             nonce: nonce_6_bytes,
-//             hash: hash_slice,
-//         },
-//     )
-// }
-
+#[inline]
 pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
     let nonce_bytes = nonce.to_be_bytes();
     let nonce_6_bytes: [u8; NONCE_SIZE] = nonce_bytes[2..8].try_into().unwrap();
@@ -114,9 +91,11 @@ pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
     let hash_bytes = hash.as_bytes();
     let hash_slice: [u8; HASH_SIZE] = hash_bytes[0..HASH_SIZE].try_into().unwrap();
 
-    let prefix = hash_bytes[..prefix_length.min(8)]
-        .iter()
-        .fold(0u64, |acc, &b| (acc << 8) | b as u64);
+    let mut prefix = 0u64;
+    let prefix_bytes = prefix_length.min(8); // Ensure we don't read beyond 8 bytes
+    for i in 0..prefix_bytes {
+        prefix |= (hash_bytes[i] as u64) << (8 * i);
+    }
 
     (
         prefix,

@@ -178,6 +178,7 @@
 //     Ok(())
 // }
 
+// single threaded write to disk approach
 use crate::Record;
 use dashmap::DashMap;
 use std::fs::File;
@@ -198,3 +199,41 @@ pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> 
     writer.flush()?;
     Ok(())
 }
+
+// sparse file method
+// use crate::Record;
+// use dashmap::DashMap;
+// use std::fs::OpenOptions;
+// use std::io::{self, BufWriter, Write, Seek, SeekFrom};
+// use std::sync::Arc;
+// use rayon::prelude::*;
+
+// pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> io::Result<()> {
+//     let file = Arc::new(OpenOptions::new().write(true).create(true).open(filename)?);
+//     let num_threads = rayon::current_num_threads();
+//     let estimated_chunk_size = map.len() * 32 / num_threads; // Simplified estimate
+
+//     map.par_iter().for_each(|entry| {
+//         let key = *entry.key();
+//         let records = entry.value();
+//         let offset = calculate_offset(&key, estimated_chunk_size);
+
+//         let local_file = file.clone();
+//         let mut local_writer = BufWriter::new(&*local_file);
+//         local_writer.seek(SeekFrom::Start(offset)).unwrap();
+        
+//         for record in records.iter() {
+//             local_writer.write_all(&record.nonce).unwrap();
+//             local_writer.write_all(&record.hash).unwrap();
+//         }
+
+//         local_writer.flush().unwrap();
+//     });
+
+//     Ok(())
+// }
+
+// /// Calculates the file offset for a given key.
+// fn calculate_offset(key: &u64, base_chunk_size: usize) -> u64 {
+//     *key as u64 * base_chunk_size as u64
+// }
