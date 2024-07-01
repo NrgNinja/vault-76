@@ -221,7 +221,7 @@
 //         let local_file = file.clone();
 //         let mut local_writer = BufWriter::new(&*local_file);
 //         local_writer.seek(SeekFrom::Start(offset)).unwrap();
-        
+
 //         for record in records.iter() {
 //             local_writer.write_all(&record.nonce).unwrap();
 //             local_writer.write_all(&record.hash).unwrap();
@@ -241,10 +241,10 @@
 // varvara's method of using a sparse file to store hashes
 use crate::Record;
 use dashmap::DashMap;
-use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Write, Seek, SeekFrom};
-use std::sync::Arc;
 use rayon::prelude::*;
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+use std::sync::Arc;
 
 pub fn create_sparse_file(filename: &str, size: u64) -> io::Result<()> {
     let file = OpenOptions::new().write(true).create(true).open(filename)?;

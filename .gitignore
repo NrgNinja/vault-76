@@ -3,3 +3,4 @@ entrance/target/debug/
 entrance/target/
 Cargo.lock
 output.bin
+.DS_Store
