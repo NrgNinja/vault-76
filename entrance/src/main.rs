@@ -1,6 +1,8 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
+use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -17,8 +19,7 @@ struct Record {
     hash: [u8; 26],
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault")
         .version("2.0")
@@ -115,16 +116,29 @@ async fn main() {
         hash_sorter::sort_hashes(&mut hashes);
         let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
         println!("Sorting hashes took {:?}", hash_sort_duration);
-
     }
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if !output_file.is_empty() {
         let start_store_output_timer: Instant = Instant::now();
-        match store_hashes::store_hashes(&hashes, output_file, &num_threads).await {
-            Ok(_) => println!("Hashes successfully written to {}", output_file),
-            Err(e) => eprintln!("Error writing hashes to file: {}", e),
-        }
+
+        let total_size = (hashes.len() as u64) * 32;
+
+        let start_create_sparse_timer = Instant::now();
+        let _ = store_hashes::create_sparse_file(output_file, total_size);
+        let create_sparse_duration = start_create_sparse_timer.elapsed();
+        println!("Sparse file gets created in {:?}", create_sparse_duration);
+
+        let chunk_size = hashes.len() / num_threads;
+
+        hashes
+            .par_chunks(chunk_size)
+            .enumerate()
+            .for_each(|(i, chunk)| {
+                let offset = (i * chunk_size) as u64 * 32;
+                store_hashes::store_hashes_chunk(chunk, output_file, offset)
+                    .expect("Failed to store hashes");
+            });
         let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
         println!("Writing hashes to disk took {:?}", store_output_duration);
     }
