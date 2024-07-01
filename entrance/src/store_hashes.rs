@@ -179,26 +179,26 @@
 // }
 
 // single threaded write to disk approach
-use crate::Record;
-use dashmap::DashMap;
-use std::fs::File;
-use std::io::{BufWriter, Result, Write};
+// use crate::Record;
+// use dashmap::DashMap;
+// use std::fs::File;
+// use std::io::{BufWriter, Result, Write};
 
-// Function to serialize and store records from a DashMap into a binary file
-pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> Result<()> {
-    let file = File::create(filename)?;
-    let mut writer = BufWriter::new(file);
+// // Function to serialize and store records from a DashMap into a binary file
+// pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> Result<()> {
+//     let file = File::create(filename)?;
+//     let mut writer = BufWriter::new(file);
 
-    for record_vec in map.iter() {
-        for record in record_vec.value() {
-            writer.write_all(&record.nonce)?;
-            writer.write_all(&record.hash)?;
-        }
-    }
+//     for record_vec in map.iter() {
+//         for record in record_vec.value() {
+//             writer.write_all(&record.nonce)?;
+//             writer.write_all(&record.hash)?;
+//         }
+//     }
 
-    writer.flush()?;
-    Ok(())
-}
+//     writer.flush()?;
+//     Ok(())
+// }
 
 // sparse file method
 // use crate::Record;
@@ -237,3 +237,42 @@ pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> 
 // fn calculate_offset(key: &u64, base_chunk_size: usize) -> u64 {
 //     *key as u64 * base_chunk_size as u64
 // }
+
+// varvara's method of using a sparse file to store hashes
+use crate::Record;
+use dashmap::DashMap;
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Write, Seek, SeekFrom};
+use std::sync::Arc;
+use rayon::prelude::*;
+
+pub fn create_sparse_file(filename: &str, size: u64) -> io::Result<()> {
+    let file = OpenOptions::new().write(true).create(true).open(filename)?;
+    file.set_len(size)?;
+    Ok(())
+}
+
+pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str, num_threads: usize) -> io::Result<()> {
+    let total_size = map.len() as u64 * 32; // Assuming each record takes up 32 bytes
+    create_sparse_file(filename, total_size)?;
+
+    let file = Arc::new(OpenOptions::new().write(true).open(filename)?);
+    let chunk_size = total_size / num_threads as u64;
+
+    map.par_iter().for_each(|entry| {
+        let local_file = file.clone();
+        let offset = *entry.key() as u64 * chunk_size;
+
+        let mut local_writer = BufWriter::new(&*local_file);
+        local_writer.seek(SeekFrom::Start(offset)).unwrap();
+
+        for record in entry.value() {
+            let encoded = bincode::serialize(record).expect("Failed to serialize hash");
+            local_writer.write_all(&encoded).unwrap();
+        }
+
+        local_writer.flush().unwrap();
+    });
+
+    Ok(())
+}

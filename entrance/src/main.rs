@@ -258,10 +258,18 @@ fn main() {
 
     let storage_start = Instant::now();
 
+    // if !output_file.is_empty() {
+    //     if let Err(e) = store_hashes::store_hashes_dashmap(&map, output_file) {
+    //         eprintln!("Error writing hashes to file: {}", e);
+    //     }
+    // }
     if !output_file.is_empty() {
-        if let Err(e) = store_hashes::store_hashes_dashmap(&map, output_file) {
-            eprintln!("Error writing hashes to file: {}", e);
-        }
+        // let storage_start = Instant::now();
+
+        let _ = store_hashes::store_hashes_dashmap(&map, output_file, num_threads);
+
+        // let storage_duration = storage_start.elapsed();
+        // println!("Writing hashes to disk took {:?}", storage_duration);
     }
 
     let storage_duration = storage_start.elapsed();

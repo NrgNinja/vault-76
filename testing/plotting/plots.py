@@ -15,7 +15,7 @@ def plot_performance(threads, gen_times, write_times):
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_xlabel('Number of Threads')
     ax.set_ylabel('Time (seconds)')
-    ax.set_title('33 Million Records on Macbook Air (M2)')
+    ax.set_title('33 Million Records on Mystic (Ubuntu)')
     ax.set_xticks(index + bar_width / 2)
     ax.set_xticklabels(threads)
     ax.legend()
@@ -24,8 +24,8 @@ def plot_performance(threads, gen_times, write_times):
     plt.show()
 
 # Sample data - replace these with your actual data
-threads = ['1', '2', '4', '8']
-gen_times = [7.0, 3.8, 2.1, 1.9]  # Example generation times
-write_times = [0.6, 0.8, 0.9, 0.7]  # Example write-to-disk times
+threads = ['1', '2', '4', '8', '16', '32']
+gen_times = [11.5, 6.8, 5.1, 3.2, 2.4, 3.0]  # Example generation times
+write_times = [5.9, 3.5, 2.3, 2.1, 2.3, 2.8]  # Example write-to-disk times
 
 plot_performance(threads, gen_times, write_times)
