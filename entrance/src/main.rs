@@ -12,7 +12,7 @@ mod print_records;
 mod store_hashes;
 
 #[allow(dead_code)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 
 struct Record {
     nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
@@ -104,6 +104,8 @@ fn main() {
         .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
         .collect();
 
+    let chunk_size: usize = hashes.len() / num_threads;
+
     let hash_gen_duration = start_hash_gen_timer.elapsed();
     println!(
         "Generating {} hashes took {:?}",
@@ -113,6 +115,7 @@ fn main() {
     // Calls a function that sorts hashes in memory (hash_sorter.rs)
     if sorting_on {
         let start_hash_sort_timer: Instant = Instant::now();
+        // hash_sorter::sort_hashes(&mut hashes);
         hash_sorter::sort_hashes(&mut hashes);
         let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
         println!("Sorting hashes took {:?}", hash_sort_duration);
@@ -128,8 +131,6 @@ fn main() {
         let _ = store_hashes::create_sparse_file(output_file, total_size);
         let create_sparse_duration = start_create_sparse_timer.elapsed();
         println!("Sparse file gets created in {:?}", create_sparse_duration);
-
-        let chunk_size = hashes.len() / num_threads;
 
         hashes
             .par_chunks(chunk_size)
