@@ -106,7 +106,7 @@ const HASH_SIZE: usize = 26;
 //     )
 // }
 
-#[inline]
+#[inline(always)]
 pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
     let nonce_bytes = nonce.to_be_bytes();
     let mut hasher = Hasher::new();
@@ -114,9 +114,11 @@ pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
     let hash = hasher.finalize();
     let hash_bytes = hash.as_bytes();
 
-    let prefix = hash_bytes[0..prefix_length.min(8)]
-        .iter()
-        .fold(0u64, |acc, &b| (acc << 8) | b as u64);
+    let mut prefix = 0u64;
+    for i in 0..prefix_length.min(8) {
+        prefix <<= 8;
+        prefix |= hash_bytes[i] as u64;
+    }
 
     (
         prefix,
