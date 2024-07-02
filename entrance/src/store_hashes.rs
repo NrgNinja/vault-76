@@ -3,15 +3,16 @@ use std::io::{self, Seek, SeekFrom, Write};
 
 use crate::Record;
 
-pub fn create_sparse_file(filename: &str, size: u64) -> io::Result<()> {
-    let file = OpenOptions::new().write(true).create(true).open(filename)?;
-    file.set_len(size)?;
-    // println!("{:?}", file);
-    Ok(())
-}
+// pub fn create_sparse_file(filename: &str, size: u64) -> io::Result<()> {
+//     let file = OpenOptions::new().write(true).create(true).open(filename)?;
+//     file.set_len(size)?;
+//     // println!("{:?}", file);
+//     Ok(())
+// }
 
 pub fn store_hashes_chunk(chunk: &[Record], filename: &str, offset: u64) -> io::Result<()> {
-    let mut file = OpenOptions::new().write(true).open(filename)?;
+    let path = format!("output/{}", filename);
+    let mut file = OpenOptions::new().write(true).create(true).open(path)?;
 
     let record_size = 32;
 

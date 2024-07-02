@@ -4,7 +4,6 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::time::Instant;
 
 mod hash_generator;
@@ -95,6 +94,8 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
 
+    let directory = "./output";
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
@@ -131,7 +132,6 @@ fn main() {
         let start_store_output_timer: Instant = Instant::now();
 
         // let total_size = (hashes.len() as u64) * 32;
-
         // let start_create_sparse_timer = Instant::now();
         // let _ = store_hashes::create_sparse_file(&"output.bin", total_size);
         // let create_sparse_duration = start_create_sparse_timer.elapsed();
@@ -142,24 +142,12 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| {
                 let first_hash = hex::encode(chunk.first().unwrap().hash);
-                println!("{}", first_hash);
                 let last_hash = hex::encode(chunk.last().unwrap().hash);
-                println!("{}", last_hash);
-
                 let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
-                println!("{}", chunk_filename);
-
-                // Ensure the output directory exists
-                let output_dir = std::path::Path::new(&chunk_filename)
-                    .parent()
-                    .unwrap_or(std::path::Path::new("."));
-                if !output_dir.exists() {
-                    fs::create_dir_all(output_dir).expect("Failed to create output directory");
-                }
 
                 let offset = (i * chunk_size) as u64 * 32;
-                // store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
-                //     .expect("Failed to store hashes");
+                store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
+                    .expect("Failed to store hashes");
             });
         let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
         println!("Writing hashes to disk took {:?}", store_output_duration);
@@ -175,10 +163,10 @@ fn main() {
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    // if num_records_to_print != 0 {
-    //     match print_records::print_records(output_file, num_records_to_print) {
-    //         Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-    //         Err(e) => eprintln!("Error deserializing hashes: {}", e),
-    //     }
-    // }
+    if num_records_to_print != 0 {
+        match print_records::print_records(directory, num_records_to_print) {
+            Ok(_) => println!("Hashes successfully deserialized from {}", directory),
+            Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
+    }
 }

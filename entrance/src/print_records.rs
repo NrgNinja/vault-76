@@ -19,25 +19,70 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
 }
 
 // function to deserialize and print all of the records into command line
-pub fn print_records(filename: &str, num_records_print: u64) -> io::Result<()> {
-    let file = File::open(filename)?;
-    let mut reader = BufReader::new(file);
+// pub fn print_records(filename: &str, num_records_print: u64) -> io::Result<()> {
+//     let file = File::open(filename)?;
+//     let mut reader = BufReader::new(file);
+
+//     println!("Here are the first {num_records_print} records:");
+//     println!("{:<20} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
+//     println!("{}", "-".repeat(88)); // Creates a separator line
+
+//     let mut counter = 0;
+
+//     while counter < num_records_print {
+//         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
+//             Ok(record) => {
+//                 let nonce_decimal = nonce_to_decimal(&record.nonce);
+//                 let hash_hex = hash_to_string(&record.hash);
+//                 println!("{:<20} | {}", nonce_decimal, hash_hex);
+//                 counter += 1;
+//             }
+//             Err(_) => break,
+//         }
+//     }
+
+//     Ok(())
+// }
+
+pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> {
+    let mut paths: Vec<_> = std::fs::read_dir(directory)?
+        .filter_map(Result::ok)
+        .collect();
+
+    // Sort paths based on the filenames
+    paths.sort_by_key(|dir_entry| dir_entry.file_name());
 
     println!("Here are the first {num_records_print} records:");
     println!("{:<20} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
     println!("{}", "-".repeat(88)); // Creates a separator line
 
     let mut counter = 0;
+    for path in paths {
+        let file_path = path.path();
+        let filename = file_path.file_name().unwrap().to_str().unwrap();
 
-    while counter < num_records_print {
-        match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
-            Ok(record) => {
-                let nonce_decimal = nonce_to_decimal(&record.nonce);
-                let hash_hex = hash_to_string(&record.hash);
-                println!("{:<20} | {}", nonce_decimal, hash_hex);
-                counter += 1;
+        // Skip files that don't follow the expected naming pattern
+        if !filename.contains("-") || !filename.ends_with(".bin") {
+            continue;
+        }
+
+        let file = File::open(file_path)?;
+        let mut reader = BufReader::new(file);
+
+        while counter < num_records_print {
+            match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
+                Ok(record) => {
+                    let nonce_decimal = nonce_to_decimal(&record.nonce);
+                    let hash_hex = hash_to_string(&record.hash);
+                    println!("{:<20} | {}", nonce_decimal, hash_hex);
+                    counter += 1;
+                }
+                Err(_) => break,
             }
-            Err(_) => break,
+        }
+
+        if counter >= num_records_print {
+            break;
         }
     }
 

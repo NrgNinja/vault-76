@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Specify the output directory
+output_dir="../output"
+
+# Clean the output directory
+echo "Cleaning the output directory..."
+rm -rf "${output_dir:?}"/*
+
 k="$1"
 threads="$2"
 cd ..
@@ -48,7 +55,7 @@ avg_sorting_time=$(echo "scale=3; $sorting_time / $num_runs" | bc)
 avg_writing_time=$(echo "scale=3; $writing_time / $num_runs" | bc)
 average_time=$(echo "scale=3; $total_time / $num_runs" | bc)
 
-echo "Average generating time: $avg_generating_time seconds"
-echo "Average sorting time: $avg_sorting_time seconds"
-echo "Average writing to disk time: $avg_writing_time seconds"
-echo "Average time: $average_time seconds"
+echo "Average generating time: $avg_generating_time"
+echo "Average sorting time: $avg_sorting_time"
+echo "Average writing to disk time: $avg_writing_time"
+echo "Average time: $average_time"
