@@ -231,7 +231,7 @@ fn main() {
 
     let prefix_length = matches
         .value_of("prefix-length")
-        .unwrap_or("12")
+        .unwrap_or("2")
         .parse::<usize>()
         .expect("Please provide a valid integer for prefix length");
 
@@ -264,12 +264,7 @@ fn main() {
     //     }
     // }
     if !output_file.is_empty() {
-        // let storage_start = Instant::now();
-
-        let _ = store_hashes::store_hashes_dashmap(&map, output_file, num_threads);
-
-        // let storage_duration = storage_start.elapsed();
-        // println!("Writing hashes to disk took {:?}", storage_duration);
+        let _ = store_hashes::store_hashes_dashmap(&map, output_file);
     }
 
     let storage_duration = storage_start.elapsed();
@@ -277,11 +272,39 @@ fn main() {
 
     let total_duration = generation_duration + storage_duration;
 
-    let num_buckets: u128 = 2u128.pow((prefix_length * 8) as u32);
+    // let num_buckets: u128 = 2u128.pow((prefix_length * 8) as u32);
+
+    // snippet to check the contents of the map
+    let num_keys = map.len();
+    println!("Total number of unique prefix buckets: {}", num_keys);
+
+    let average_records_per_key =
+        map.iter().map(|entry| entry.value().len()).sum::<usize>() as f64 / num_keys as f64;
+    println!(
+        "Average number of records per prefix bucket: {:.2}",
+        average_records_per_key
+    );
+
+    let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
+    println!("Total number of records stored: {}", total_records);
+
+    if total_records == num_records as usize {
+        println!("The total number of records is correct!.");
+    } else {
+        println!(
+            "Mismatch: the total number of records does not match 2^25. Found {}",
+            total_records
+        );
+    }
+
+    // If you want to see details of each bucket, uncomment the following lines
+    // map.iter().for_each(|entry| {
+    //     println!("Prefix {:?} has {} records", *entry.key(), entry.value().len());
+    // });
 
     println!(
         "Time taken for {} parallel insertions into {} buckets using {} threads: {:?}",
-        num_records, num_buckets, num_threads, total_duration
+        total_records, num_keys, num_threads, total_duration
     );
 
     if let Some(num_records_to_print) = matches

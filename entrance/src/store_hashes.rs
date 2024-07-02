@@ -242,6 +242,7 @@
 use crate::Record;
 use dashmap::DashMap;
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::sync::Arc;
@@ -252,16 +253,26 @@ pub fn create_sparse_file(filename: &str, size: u64) -> io::Result<()> {
     Ok(())
 }
 
-pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str, num_threads: usize) -> io::Result<()> {
-    let total_size = map.len() as u64 * 32; // Assuming each record takes up 32 bytes
-    create_sparse_file(filename, total_size)?;
+pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> io::Result<()> {
+    let mut cumulative_offset = 0u64;
+    let mut key_offsets = HashMap::new();
+
+    // Calculate offsets for each key based on the actual data size.
+    for entry in map.iter() {
+        let data_size = entry.value().len() as u64 * 32; // Each record is 32 bytes
+        key_offsets.insert(*entry.key(), cumulative_offset);
+        cumulative_offset += data_size;
+    }
+
+    // Create a sparse file of the right total size.
+    create_sparse_file(filename, cumulative_offset)?;
 
     let file = Arc::new(OpenOptions::new().write(true).open(filename)?);
-    let chunk_size = total_size / num_threads as u64;
 
+    // Parallel writing using pre-calculated offsets.
     map.par_iter().for_each(|entry| {
         let local_file = file.clone();
-        let offset = *entry.key() as u64 * chunk_size;
+        let offset = key_offsets[entry.key()];
 
         let mut local_writer = BufWriter::new(&*local_file);
         local_writer.seek(SeekFrom::Start(offset)).unwrap();
