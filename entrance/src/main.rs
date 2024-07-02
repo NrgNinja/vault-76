@@ -254,7 +254,7 @@ fn main() {
         });
 
     let generation_duration = generation_start.elapsed();
-    println!("Hash generation took {:?}", generation_duration);
+    println!("Hash generation & storing into DashMap took {:?}", generation_duration);
 
     let storage_start = Instant::now();
 
@@ -268,7 +268,7 @@ fn main() {
     }
 
     let storage_duration = storage_start.elapsed();
-    println!("Writing hashes to disk took {:?}", storage_duration);
+    println!("Writing hashes to disk took about {:?}", storage_duration);
 
     let total_duration = generation_duration + storage_duration;
 
@@ -289,7 +289,7 @@ fn main() {
     println!("Total number of records stored: {}", total_records);
 
     if total_records == num_records as usize {
-        println!("The total number of records is correct!.");
+        println!("The total number of records is correct!");
     } else {
         println!(
             "Mismatch: the total number of records does not match 2^25. Found {}",
