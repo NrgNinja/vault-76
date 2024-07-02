@@ -4,6 +4,7 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::time::Instant;
 
 mod hash_generator;
@@ -32,9 +33,9 @@ fn main() {
                 .help("Specify k value to compute 2^k nonces"),
         )
         .arg(
-            Arg::with_name("filename")
-                .short('f')
-                .long("filename")
+            Arg::with_name("writing_on")
+                .short('w')
+                .long("writing_on")
                 .takes_value(true)
                 .help("Output file to store the generated hashes"),
         )
@@ -82,7 +83,11 @@ fn main() {
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
-    let output_file = matches.value_of("filename").unwrap_or("");
+    let writing_on = matches
+        .value_of("writing_on")
+        .unwrap_or("true")
+        .parse::<bool>()
+        .expect("Please provide a valid value for writing to disk on/off (true/false)");
 
     let sorting_on = matches
         .value_of("sorting_on")
@@ -122,23 +127,39 @@ fn main() {
     }
 
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    if !output_file.is_empty() {
+    if writing_on {
         let start_store_output_timer: Instant = Instant::now();
 
-        let total_size = (hashes.len() as u64) * 32;
+        // let total_size = (hashes.len() as u64) * 32;
 
-        let start_create_sparse_timer = Instant::now();
-        let _ = store_hashes::create_sparse_file(output_file, total_size);
-        let create_sparse_duration = start_create_sparse_timer.elapsed();
-        println!("Sparse file gets created in {:?}", create_sparse_duration);
+        // let start_create_sparse_timer = Instant::now();
+        // let _ = store_hashes::create_sparse_file(&"output.bin", total_size);
+        // let create_sparse_duration = start_create_sparse_timer.elapsed();
+        // println!("Sparse file gets created in {:?}", create_sparse_duration);
 
         hashes
             .par_chunks(chunk_size)
             .enumerate()
             .for_each(|(i, chunk)| {
+                let first_hash = hex::encode(chunk.first().unwrap().hash);
+                println!("{}", first_hash);
+                let last_hash = hex::encode(chunk.last().unwrap().hash);
+                println!("{}", last_hash);
+
+                let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+                println!("{}", chunk_filename);
+
+                // Ensure the output directory exists
+                let output_dir = std::path::Path::new(&chunk_filename)
+                    .parent()
+                    .unwrap_or(std::path::Path::new("."));
+                if !output_dir.exists() {
+                    fs::create_dir_all(output_dir).expect("Failed to create output directory");
+                }
+
                 let offset = (i * chunk_size) as u64 * 32;
-                store_hashes::store_hashes_chunk(chunk, output_file, offset)
-                    .expect("Failed to store hashes");
+                // store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
+                //     .expect("Failed to store hashes");
             });
         let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
         println!("Writing hashes to disk took {:?}", store_output_duration);
@@ -149,15 +170,15 @@ fn main() {
     if sorting_on {
         print!(", sorted");
     }
-    if !output_file.is_empty() {
+    if writing_on {
         print!(", stored");
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    if num_records_to_print != 0 {
-        match print_records::print_records(output_file, num_records_to_print) {
-            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-            Err(e) => eprintln!("Error deserializing hashes: {}", e),
-        }
-    }
+    // if num_records_to_print != 0 {
+    //     match print_records::print_records(output_file, num_records_to_print) {
+    //         Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+    //         Err(e) => eprintln!("Error deserializing hashes: {}", e),
+    //     }
+    // }
 }
