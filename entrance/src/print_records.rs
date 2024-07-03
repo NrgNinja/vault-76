@@ -18,7 +18,7 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
         .join("")
 }
 
-// function to deserialize and print all of the records into command line
+// function to deserialize and print all of the records into command line from a single file
 // pub fn print_records(filename: &str, num_records_print: u64) -> io::Result<()> {
 //     let file = File::open(filename)?;
 //     let mut reader = BufReader::new(file);
@@ -44,6 +44,7 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
 //     Ok(())
 // }
 
+// Print records from all the files stored in the directory
 pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> {
     let mut paths: Vec<_> = std::fs::read_dir(directory)?
         .filter_map(Result::ok)
@@ -52,6 +53,7 @@ pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> 
     // Sort paths based on the filenames
     paths.sort_by_key(|dir_entry| dir_entry.file_name());
 
+    println!("{}", "-".repeat(88));
     println!("Here are the first {num_records_print} records:");
     println!("{:<20} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
     println!("{}", "-".repeat(88)); // Creates a separator line

@@ -1,9 +1,7 @@
 // this file stores the hash generation process of the vault
-use crate::Record;
+use crate::{Record, HASH_SIZE, NONCE_SIZE};
 use blake3::Hasher;
 
-const NONCE_SIZE: usize = 6;
-const HASH_SIZE: usize = 26;
 
 // multi-threaded approach - bytes
 pub fn generate_hash(nonce: u64) -> Record {

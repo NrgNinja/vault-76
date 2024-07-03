@@ -12,6 +12,7 @@ sleep 5
 
 k="$1"
 threads="$2"
+hash="$3"
 cd ..
 
-./target/release/entrance -k $k -t $threads -p 10
+./target/release/entrance -k $k -t $threads -p 10 -h $hash

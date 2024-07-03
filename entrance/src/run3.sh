@@ -3,10 +3,6 @@
 # Specify the output directory
 output_dir="../output"
 
-# Clean the output directory
-echo "Cleaning the output directory..."
-rm -rf "${output_dir:?}"/*
-
 k="$1"
 threads="$2"
 cd ..
@@ -18,6 +14,10 @@ total_time=0
 num_runs=3
 
 for n in {1..3}; do
+    # Clean the output directory
+    echo "Cleaning the output directory..."
+    rm -rf "${output_dir:?}"/*
+
     free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
     sleep 3
 

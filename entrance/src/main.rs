@@ -8,15 +8,18 @@ use std::time::Instant;
 
 mod hash_generator;
 mod hash_sorter;
+mod lookup;
 mod print_records;
 mod store_hashes;
 
+pub const NONCE_SIZE: usize = 6;
+pub const HASH_SIZE: usize = 26;
+
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-
 struct Record {
-    nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
-    hash: [u8; 26],
+    nonce: [u8; NONCE_SIZE], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
+    hash: [u8; HASH_SIZE],
 }
 
 fn main() {
@@ -60,6 +63,14 @@ fn main() {
                 .default_value("1") 
                 .help("Number of threads to use for hash generation"),
         )
+        .arg(
+            Arg::with_name("target_hash")
+                .short('h')
+                .long("target_hash")
+                .takes_value(true)
+                .default_value("1") 
+                .help("String hash to lookup from the data"),
+        )
         .get_matches();
 
     let k = matches
@@ -93,6 +104,17 @@ fn main() {
         .unwrap_or("true")
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
+
+    let target_hash = matches.value_of("target_hash").unwrap_or("1");
+    // .parse::<[u8; 26]>()
+    // .expect("Please provide a valid value for sorting_on (true/false)");
+    let target_hash = {
+        let mut bytes = [0u8; HASH_SIZE];
+        bytes.copy_from_slice(&target_hash.as_bytes()[..HASH_SIZE]);
+        bytes
+    };
+   
+    // let target_hash: [u8; 26] = target_hash[0..26].try_into().unwrap();
 
     let directory = "./output";
 
@@ -168,5 +190,11 @@ fn main() {
             Ok(_) => println!("Hashes successfully deserialized from {}", directory),
             Err(e) => eprintln!("Error deserializing hashes: {}", e),
         }
+    }
+
+    match lookup::lookup_hash(directory, &target_hash) {
+        Ok(Some(record)) => println!("Found record: {:?}", record),
+        Ok(None) => println!("Hash not found"),
+        Err(e) => eprintln!("Error occurred: {}", e),
     }
 }
