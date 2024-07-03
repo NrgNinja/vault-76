@@ -59,7 +59,7 @@ Make sure to include `--` after `--release`, if you plan on using more flags.
 
 ### Example:
 ```bash
-cargo run --release -- -k 25 -t 8 -p 10 -f output.bin
+cargo run --release -- -k 25 -t 8 -f output.bin -p 10
 ```
 *This runs vault operations with `8` threads and generates 2^k records, where k is `25` (so 33554432  records). Sorting is on (`true`) by default, and will be written to the output file specified `output.bin`. Finally, `10` records will be printed to the command line.*
 
