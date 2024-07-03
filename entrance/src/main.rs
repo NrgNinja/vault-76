@@ -1,9 +1,11 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
+use lazy_static::lazy_static;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use std::time::Instant;
 
 mod hash_generator;
@@ -20,6 +22,10 @@ pub const HASH_SIZE: usize = 26;
 struct Record {
     nonce: [u8; NONCE_SIZE], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
     hash: [u8; HASH_SIZE],
+}
+
+lazy_static! {
+    static ref FILE_INDEX: Mutex<Vec<(String, String, String)>> = Mutex::new(Vec::new());
 }
 
 fn main() {
@@ -68,7 +74,6 @@ fn main() {
                 .short('h')
                 .long("target_hash")
                 .takes_value(true)
-                .default_value("1") 
                 .help("String hash to lookup from the data"),
         )
         .get_matches();
@@ -105,16 +110,14 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
 
-    let target_hash = matches.value_of("target_hash").unwrap_or("1");
-    // .parse::<[u8; 26]>()
-    // .expect("Please provide a valid value for sorting_on (true/false)");
-    let target_hash = {
-        let mut bytes = [0u8; HASH_SIZE];
-        bytes.copy_from_slice(&target_hash.as_bytes()[..HASH_SIZE]);
-        bytes
-    };
-   
-    // let target_hash: [u8; 26] = target_hash[0..26].try_into().unwrap();
+    let target_hash = matches
+        .value_of("target_hash")
+        .unwrap_or("00000000000000000000000000");
+    // let target_hash = {
+    //     let mut bytes = [0u8; HASH_SIZE];
+    //     bytes.copy_from_slice(&target_hash.as_bytes()[..HASH_SIZE]);
+    //     bytes
+    // };
 
     let directory = "./output";
 
@@ -143,7 +146,6 @@ fn main() {
     // Calls a function that sorts hashes in memory (hash_sorter.rs)
     if sorting_on {
         let start_hash_sort_timer: Instant = Instant::now();
-        // hash_sorter::sort_hashes(&mut hashes);
         hash_sorter::sort_hashes(&mut hashes);
         let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
         println!("Sorting hashes took {:?}", hash_sort_duration);
@@ -152,12 +154,6 @@ fn main() {
     // Calls store_hashes function to serialize generated hashes into binary and store them on disk
     if writing_on {
         let start_store_output_timer: Instant = Instant::now();
-
-        // let total_size = (hashes.len() as u64) * 32;
-        // let start_create_sparse_timer = Instant::now();
-        // let _ = store_hashes::create_sparse_file(&"output.bin", total_size);
-        // let create_sparse_duration = start_create_sparse_timer.elapsed();
-        // println!("Sparse file gets created in {:?}", create_sparse_duration);
 
         hashes
             .par_chunks(chunk_size)
@@ -170,7 +166,12 @@ fn main() {
                 let offset = (i * chunk_size) as u64 * 32;
                 store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
                     .expect("Failed to store hashes");
+
+                // Update in-memory index
+                let mut index = FILE_INDEX.lock().unwrap();
+                index.push((chunk_filename.clone(), first_hash, last_hash));
             });
+
         let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
         println!("Writing hashes to disk took {:?}", store_output_duration);
     }
@@ -192,9 +193,18 @@ fn main() {
         }
     }
 
-    match lookup::lookup_hash(directory, &target_hash) {
-        Ok(Some(record)) => println!("Found record: {:?}", record),
-        Ok(None) => println!("Hash not found"),
-        Err(e) => eprintln!("Error occurred: {}", e),
+    if target_hash != "00000000000000000000000000" {
+        let start_lookup_timer = Instant::now();
+
+        // let file = lookup::lookup_hash(directory, &target_hash);
+        // println!("Hash is stored in {:?} file", file);
+        match lookup::lookup_hash(directory, &target_hash) {
+            Ok(Some(record)) => println!("Found record: {:?}", record),
+            Ok(None) => println!("Hash not found"),
+            Err(e) => eprintln!("Error occurred: {}", e),
+        }
+
+        let lookup_duration = start_lookup_timer.elapsed();
+        println!("Looking up {} hash took {:?}", target_hash, lookup_duration);
     }
 }

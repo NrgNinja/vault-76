@@ -3,7 +3,7 @@ use bincode::deserialize_from;
 use std::fs::File;
 use std::io::{self, BufReader};
 
-fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
+pub fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
     let mut num: u64 = 0;
     for &byte in nonce.iter() {
         num = num * 256 + byte as u64;
@@ -11,7 +11,7 @@ fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
     num
 }
 
-fn hash_to_string(hash: &[u8; 26]) -> String {
+pub fn hash_to_string(hash: &[u8; 26]) -> String {
     hash.iter()
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<String>>()

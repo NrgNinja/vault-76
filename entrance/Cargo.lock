@@ -160,6 +160,7 @@ dependencies = [
  "clap",
  "hex",
  "indicatif",
+ "lazy_static",
  "rayon",
  "serde",
 ]
