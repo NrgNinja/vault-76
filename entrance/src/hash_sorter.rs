@@ -1,3 +1,5 @@
+// no need to sort hashes if we're using a DashMap data structure
+// only necessary if we're using a Vector data structure to store hashes
 use crate::Record;
 use rayon::prelude::*;
 

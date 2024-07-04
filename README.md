@@ -59,7 +59,7 @@ Make sure to include `--` after `--release`, if you plan on using more flags.
 
 ### Example:
 ```bash
-cargo run --release -- -k 25 -t 8 -p 10 -f output.bin
+cargo run --release -- -k 25 -t 8 -f output.bin -p 10
 ```
 *This runs vault operations with `8` threads and generates 2^k records, where k is `25` (so 33554432  records). Sorting is on (`true`) by default, and will be written to the output file specified `output.bin`. Finally, `10` records will be printed to the command line.*
 
@@ -111,9 +111,8 @@ The script first cleans cache, then runs release build with specified parameters
 [Allows multiple threads to access a shared resource while ensuring that only one thread can access it at a time.](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
 
 ## Known Bugs
-* In comparison to the OG Vault, it is still not fast enough. We suspect it may have to do with the generation of hashes, and are trying new approaches to make it faster. But in terms of code neatness and readability, it is much easier to understand in this Rust codebase.
-* All vault operations seem to run slower when asked to print records, although printing isn't accounted into the timers. 
-* We are thinking of using a DashMap for parallel insertions of our hashes. 
+* The generation of hashes and storing them into a dashmap is a consistent ~2-3 seconds depending on your system and thread count. There doesn't seem to be a way to make this faster at the moment.
+* Writing to disk using a sparse file from a DashMap is a consistent ~1 second, is there any way to make this under a second?
 
 ## TODO:
 * keep README up to date 
