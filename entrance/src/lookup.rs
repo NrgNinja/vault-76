@@ -3,34 +3,7 @@ use std::{
     io::{self, BufReader},
 };
 
-// use bincode::deserialize_from;
-
 use crate::{print_records, Record, FILE_INDEX, HASH_SIZE};
-
-// fn get_file_for_hash(directory: &str, target_hash: &[u8; 26]) -> Option<String> {
-//     let target_hash_hex = hex::encode(target_hash);
-
-//     let paths: Vec<_> = fs::read_dir(directory)
-//         .unwrap()
-//         .filter_map(Result::ok)
-//         .collect();
-
-//     println!("{:?}", paths);
-
-//     for path in paths {
-//         let filename = path.file_name().into_string().unwrap();
-
-//         if let Some((first_hash, last_hash)) = filename.split_once('-') {
-//             let last_hash = last_hash.trim_end_matches(".bin");
-
-//             if first_hash <= target_hash_hex.as_str() && target_hash_hex.as_str() <= last_hash {
-//                 return Some(path.path().to_string_lossy().into_owned());
-//             }
-//         }
-//     }
-
-//     None
-// }
 
 fn lookup_hash_in_file(
     file_path: &str,
@@ -71,7 +44,6 @@ pub fn lookup_hash(
     let index = FILE_INDEX.lock().unwrap();
 
     for (filename, first_hash, last_hash) in index.iter() {
-        // println!("{}, {}", first_hash, last_hash);
         if *first_hash <= target_hash && target_hash <= *last_hash {
             let file_path = format!("{}/{}", directory, filename);
             return lookup_hash_in_file(&file_path, target_hash);

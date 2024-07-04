@@ -113,11 +113,6 @@ fn main() {
     let target_hash = matches
         .value_of("target_hash")
         .unwrap_or("00000000000000000000000000");
-    // let target_hash = {
-    //     let mut bytes = [0u8; HASH_SIZE];
-    //     bytes.copy_from_slice(&target_hash.as_bytes()[..HASH_SIZE]);
-    //     bytes
-    // };
 
     let directory = "./output";
 
@@ -128,63 +123,66 @@ fn main() {
         .unwrap();
 
     let start_vault_timer: Instant = Instant::now();
-    let start_hash_gen_timer: Instant = Instant::now();
 
-    let mut hashes: Vec<Record> = (0..num_records)
-        .into_par_iter()
-        .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
-        .collect();
+    if k != 0 {
+        let start_hash_gen_timer: Instant = Instant::now();
 
-    let chunk_size: usize = hashes.len() / num_threads;
+        let mut hashes: Vec<Record> = (0..num_records)
+            .into_par_iter()
+            .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
+            .collect();
 
-    let hash_gen_duration = start_hash_gen_timer.elapsed();
-    println!(
-        "Generating {} hashes took {:?}",
-        num_records, hash_gen_duration
-    );
+        let chunk_size: usize = hashes.len() / num_threads;
 
-    // Calls a function that sorts hashes in memory (hash_sorter.rs)
-    if sorting_on {
-        let start_hash_sort_timer: Instant = Instant::now();
-        hash_sorter::sort_hashes(&mut hashes);
-        let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
-        println!("Sorting hashes took {:?}", hash_sort_duration);
+        let hash_gen_duration = start_hash_gen_timer.elapsed();
+        println!(
+            "Generating {} hashes took {:?}",
+            num_records, hash_gen_duration
+        );
+
+        // Calls a function that sorts hashes in memory (hash_sorter.rs)
+        if sorting_on {
+            let start_hash_sort_timer: Instant = Instant::now();
+            hash_sorter::sort_hashes(&mut hashes);
+            let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
+            println!("Sorting hashes took {:?}", hash_sort_duration);
+        }
+
+        // Calls store_hashes function to serialize generated hashes into binary and store them on disk
+        if writing_on {
+            let start_store_output_timer: Instant = Instant::now();
+
+            hashes
+                .par_chunks(chunk_size)
+                .enumerate()
+                .for_each(|(i, chunk)| {
+                    let first_hash = hex::encode(chunk.first().unwrap().hash);
+                    let last_hash = hex::encode(chunk.last().unwrap().hash);
+                    let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+
+                    let offset = (i * chunk_size) as u64 * 32;
+                    store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
+                        .expect("Failed to store hashes");
+
+                    // Update in-memory index
+                    let mut index = FILE_INDEX.lock().unwrap();
+                    index.push((chunk_filename.clone(), first_hash, last_hash));
+                });
+
+            let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+            println!("Writing hashes to disk took {:?}", store_output_duration);
+        }
+
+        let duration = start_vault_timer.elapsed();
+        print!("Generated");
+        if sorting_on {
+            print!(", sorted");
+        }
+        if writing_on {
+            print!(", stored");
+        }
+        println!(" {} records in {:?}", num_records, duration);
     }
-
-    // Calls store_hashes function to serialize generated hashes into binary and store them on disk
-    if writing_on {
-        let start_store_output_timer: Instant = Instant::now();
-
-        hashes
-            .par_chunks(chunk_size)
-            .enumerate()
-            .for_each(|(i, chunk)| {
-                let first_hash = hex::encode(chunk.first().unwrap().hash);
-                let last_hash = hex::encode(chunk.last().unwrap().hash);
-                let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
-
-                let offset = (i * chunk_size) as u64 * 32;
-                store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
-                    .expect("Failed to store hashes");
-
-                // Update in-memory index
-                let mut index = FILE_INDEX.lock().unwrap();
-                index.push((chunk_filename.clone(), first_hash, last_hash));
-            });
-
-        let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-        println!("Writing hashes to disk took {:?}", store_output_duration);
-    }
-
-    let duration = start_vault_timer.elapsed();
-    print!("Generated");
-    if sorting_on {
-        print!(", sorted");
-    }
-    if writing_on {
-        print!(", stored");
-    }
-    println!(" {} records in {:?}", num_records, duration);
 
     if num_records_to_print != 0 {
         match print_records::print_records(directory, num_records_to_print) {
@@ -196,8 +194,6 @@ fn main() {
     if target_hash != "00000000000000000000000000" {
         let start_lookup_timer = Instant::now();
 
-        // let file = lookup::lookup_hash(directory, &target_hash);
-        // println!("Hash is stored in {:?} file", file);
         match lookup::lookup_hash(directory, &target_hash) {
             Ok(Some(record)) => println!("Found record: {:?}", record),
             Ok(None) => println!("Hash not found"),
