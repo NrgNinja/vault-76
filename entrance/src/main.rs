@@ -8,6 +8,7 @@ use std::time::Instant;
 mod hash_generator;
 mod print_records;
 mod store_hashes;
+mod lookup;
 
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
@@ -67,7 +68,23 @@ fn main() {
                 .default_value("2") // Set a default value or make it required
                 .help("Specify the prefix length in bytes to categorize the hashes"),
         )
+        .arg(
+            Arg::with_name("lookup")
+                .short('l')
+                .long("lookup")
+                .takes_value(true)
+                .help("Lookup a record by nonce, hash, or prefix"),
+        )
         .get_matches();
+
+    // Extract values from the command line
+    if let Some(lookup_value) = matches.value_of("lookup") {
+        // Lookup functionality
+        if let Err(e) = lookup::lookup_by_prefix(matches.value_of("filename").unwrap_or(""), lookup_value) {
+            eprintln!("Error during lookup: {}", e);
+        }
+        return;
+    }
 
     let k = matches
         .value_of("k-value")
