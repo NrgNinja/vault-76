@@ -15,3 +15,6 @@ echo "Cleaning the output directory..."
 rm -rf "${output_dir:?}"/*
 
 ./target/release/entrance -k $k -t $threads -p 10
+
+file_size=$(du -hs $output_dir)
+echo "The total size of all files is $file_size"

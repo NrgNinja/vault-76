@@ -184,16 +184,16 @@ fn main() {
         }
     }
 
-    // if target_hash != "00000000000000000000000000" {
-    //     let start_lookup_timer = Instant::now();
+    if target_hash != "00000000000000000000000000" {
+        let start_lookup_timer = Instant::now();
 
-    //     match lookup::lookup_hash(directory, &target_hash) {
-    //         Ok(Some(record)) => println!("Found record: {:?}", record),
-    //         Ok(None) => println!("Hash not found"),
-    //         Err(e) => eprintln!("Error occurred: {}", e),
-    //     }
+        match lookup::lookup_hash_in_file(directory, &target_hash) {
+            Ok(Some(record)) => println!("Found record: {:?}", record),
+            Ok(None) => println!("Hash not found"),
+            Err(e) => eprintln!("Error occurred: {}", e),
+        }
 
-    //     let lookup_duration = start_lookup_timer.elapsed();
-    //     println!("Looking up {} hash took {:?}", target_hash, lookup_duration);
-    // }
+        let lookup_duration = start_lookup_timer.elapsed();
+        println!("Looking up {} hash took {:?}", target_hash, lookup_duration);
+    }
 }
