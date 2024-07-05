@@ -1,12 +1,10 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
-use lazy_static::lazy_static;
 use rand::random;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 use std::time::Instant;
 
 mod hash_generator;
@@ -23,10 +21,6 @@ pub const HASH_SIZE: usize = 26;
 struct Record {
     nonce: [u8; NONCE_SIZE], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
     hash: [u8; HASH_SIZE],
-}
-
-lazy_static! {
-    static ref FILE_INDEX: Mutex<Vec<(String, String, String)>> = Mutex::new(Vec::new());
 }
 
 fn main() {
@@ -167,10 +161,6 @@ fn main() {
                     let offset = (i * chunk_size) as u64 * 32;
                     store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
                         .expect("Failed to store hashes");
-
-                    // Update in-memory index
-                    let mut index = FILE_INDEX.lock().unwrap();
-                    index.push((chunk_filename.clone(), first_hash, last_hash));
                 });
 
             let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
@@ -195,16 +185,16 @@ fn main() {
         }
     }
 
-    if target_hash != "00000000000000000000000000" {
-        let start_lookup_timer = Instant::now();
+    // if target_hash != "00000000000000000000000000" {
+    //     let start_lookup_timer = Instant::now();
 
-        match lookup::lookup_hash(directory, &target_hash) {
-            Ok(Some(record)) => println!("Found record: {:?}", record),
-            Ok(None) => println!("Hash not found"),
-            Err(e) => eprintln!("Error occurred: {}", e),
-        }
+    //     match lookup::lookup_hash(directory, &target_hash) {
+    //         Ok(Some(record)) => println!("Found record: {:?}", record),
+    //         Ok(None) => println!("Hash not found"),
+    //         Err(e) => eprintln!("Error occurred: {}", e),
+    //     }
 
-        let lookup_duration = start_lookup_timer.elapsed();
-        println!("Looking up {} hash took {:?}", target_hash, lookup_duration);
-    }
+    //     let lookup_duration = start_lookup_timer.elapsed();
+    //     println!("Looking up {} hash took {:?}", target_hash, lookup_duration);
+    // }
 }

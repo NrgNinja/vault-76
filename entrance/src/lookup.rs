@@ -3,7 +3,7 @@ use std::{
     io::{self, BufReader},
 };
 
-use crate::{print_records, Record, FILE_INDEX, HASH_SIZE};
+use crate::{print_records, Record, HASH_SIZE};
 
 fn lookup_hash_in_file(
     file_path: &str,
@@ -35,20 +35,20 @@ fn lookup_hash_in_file(
     Ok(None)
 }
 
-pub fn lookup_hash(
-    directory: &str,
-    target_hash: &str,
-) -> Result<std::option::Option<(u64, std::string::String)>, std::io::Error> {
-    let target_hash = target_hash.to_string();
-    // Access the in-memory index
-    let index = FILE_INDEX.lock().unwrap();
+// pub fn lookup_hash(
+//     directory: &str,
+//     target_hash: &str,
+// ) -> Result<std::option::Option<(u64, std::string::String)>, std::io::Error> {
+//     let target_hash = target_hash.to_string();
+//     // Access the in-memory index
+//     let index = FILE_INDEX.lock().unwrap();
 
-    for (filename, first_hash, last_hash) in index.iter() {
-        if *first_hash <= target_hash && target_hash <= *last_hash {
-            let file_path = format!("{}/{}", directory, filename);
-            return lookup_hash_in_file(&file_path, target_hash);
-        }
-    }
+//     for (filename, first_hash, last_hash) in index.iter() {
+//         if *first_hash <= target_hash && target_hash <= *last_hash {
+//             let file_path = format!("{}/{}", directory, filename);
+//             return lookup_hash_in_file(&file_path, target_hash);
+//         }
+//     }
 
-    Ok(None)
-}
+//     Ok(None)
+// }
