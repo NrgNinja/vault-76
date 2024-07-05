@@ -16,7 +16,6 @@ mod store_hashes;
 pub const NONCE_SIZE: usize = 6;
 pub const HASH_SIZE: usize = 26;
 
-#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Record {
     nonce: [u8; NONCE_SIZE], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
