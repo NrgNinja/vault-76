@@ -14,12 +14,12 @@ total_time=0
 num_runs=10
 
 for n in {1..10}; do
+    free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
+    sleep 3
+
     # Clean the output directory
     echo "Cleaning the output directory..."
     rm -rf "${output_dir:?}"/*
-
-    free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
-    sleep 3
 
     echo ----------------------------------------Run $n---------------------------------------------
 
