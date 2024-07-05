@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Specify the output directory
-output_dir="../output"
+output_dir="../../output"
 
 # Clean the output directory
 echo "Cleaning the output directory..."

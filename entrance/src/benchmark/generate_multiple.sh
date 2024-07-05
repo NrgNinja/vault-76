@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Specify the output directory
-output_dir="../output"
+output_dir="../../output"
 
 k="$1"
 threads="$2"

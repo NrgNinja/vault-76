@@ -1,6 +1,7 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
 use lazy_static::lazy_static;
+use rand::random;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
@@ -129,7 +130,10 @@ fn main() {
 
         let mut hashes: Vec<Record> = (0..num_records)
             .into_par_iter()
-            .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
+            .map(|_| {
+                let nonce: u64 = random();
+                hash_generator::generate_hash(nonce)
+            }) // Now directly maps each nonce to a Record
             .collect();
 
         let chunk_size: usize = hashes.len() / num_threads;
