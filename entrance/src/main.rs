@@ -181,18 +181,9 @@ fn main() {
     let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
     // println!("Total number of records stored: {}", total_records);
 
-    // if total_records == num_records as usize {
-    //     println!("The total number of records is correct!");
-    // } else {
-    //     println!(
-    //         "Mismatch: the total number of records does not match 2^25. Found {}",
-    //         total_records
-    //     );
-    // }
-
     // if you want to see details of each bucket, uncomment the following lines
     // map.iter().for_each(|entry| {
-    //     println!("Prefix {:?} has {} records", *entry.key(), entry.value().len());
+    //     println!("Prefix bucket {} has {} records", *entry.key(), entry.value().len());
     // });
 
     println!(
