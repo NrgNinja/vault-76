@@ -1,10 +1,14 @@
 use std::{
     fs::File,
     io::{self, Read},
+    sync::{Arc, Mutex},
 };
+
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::Record;
 
+// Single-threaded lookup
 pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
     let target_hash_bytes = hex::decode(target_hash).expect("Invalid hex string for target hash");
 
@@ -89,4 +93,49 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
     // }
 
     Ok(None)
+}
+
+pub fn lookup_hash(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
+    let target_hash_bytes = hex::decode(target_hash).expect("Hash couldn't be converted to hex");
+
+    // Read the contents of the directory
+    let paths: Vec<_> = std::fs::read_dir(directory)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .collect();
+
+    // Mutex to store the found record
+    let found_record = Arc::new(Mutex::new(None));
+
+    // Process each file in parallel
+    paths.par_iter().for_each(|path| {
+        let mut file = match File::open(path) {
+            Ok(f) => f,
+            Err(_) => return,
+        };
+
+        let mut buffer = Vec::new();
+        if file.read_to_end(&mut buffer).is_err() {
+            return;
+        }
+
+        let chunk_size = 32;
+        let chunks = buffer.chunks_exact(chunk_size);
+
+        for chunk in chunks {
+            let record: Record = match bincode::deserialize(chunk) {
+                Ok(r) => r,
+                Err(_) => return,
+            };
+
+            if record.hash == target_hash_bytes.as_slice() {
+                let mut found = found_record.lock().unwrap();
+                *found = Some(record);
+                return;
+            }
+        }
+    });
+
+    let found = found_record.lock().unwrap();
+    Ok(*found)
 }

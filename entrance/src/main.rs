@@ -187,9 +187,17 @@ fn main() {
     if target_hash != "00000000000000000000000000" {
         let start_lookup_timer = Instant::now();
 
-        match lookup::lookup_hash_in_file(directory, &target_hash) {
+        // Single-threaded 
+        // match lookup::lookup_hash_in_file(directory, &target_hash) {
+        //     Ok(Some(record)) => println!("Found record: {:?}", record),
+        //     Ok(None) => println!("Hash not found"),
+        //     Err(e) => eprintln!("Error occurred: {}", e),
+        // }
+
+        // Multi-threaded
+        match lookup::lookup_hash(directory, target_hash) {
             Ok(Some(record)) => println!("Found record: {:?}", record),
-            Ok(None) => println!("Hash not found"),
+            Ok(None) => println!("Record not found"),
             Err(e) => eprintln!("Error occurred: {}", e),
         }
 
