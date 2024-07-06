@@ -1,9 +1,15 @@
 use std::{
-    fs::File,
-    io::{self, Read},
-    sync::{Arc, Mutex},
+    cmp::Ordering,
+    fs::{self, File},
+    io,
+    sync::{
+        atomic::{AtomicBool, Ordering as AtomicOrdering},
+        Arc, Mutex,
+    },
+    time::Instant,
 };
 
+use memmap2::Mmap;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::Record;
@@ -11,13 +17,38 @@ use crate::Record;
 // Single-threaded lookup
 pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
     let target_hash_bytes = hex::decode(target_hash).expect("Invalid hex string for target hash");
+    let target_hash_arr: [u8; 26] = target_hash_bytes
+        .as_slice()
+        .try_into()
+        .expect("Invalid array");
 
-    let entries = std::fs::read_dir(directory)?;
+    // Check if the directory exists
+    if !fs::metadata(directory).is_ok() {
+        eprintln!("Directory does not exist: {}", directory);
+        return Ok(None);
+    }
+
+    let start_get_file_names = Instant::now();
+    let entries = match std::fs::read_dir(directory) {
+        Ok(entries) => entries,
+        Err(e) => {
+            eprintln!("Failed to read directory: {}", e);
+            return Ok(None);
+        }
+    };
+    let get_file_names_duration = start_get_file_names.elapsed();
+    println!(
+        "Extracting directory file names from disk takes: {:?}",
+        get_file_names_duration
+    );
 
     for entry in entries {
+        let start_entry = Instant::now();
         let entry = entry?;
         let file_name = entry.file_name();
         let file_name = file_name.to_str().unwrap();
+
+        // println!("Checking file: {}", file_name);
 
         // Extract the hash range from the file name
         let parts: Vec<&str> = file_name.trim_end_matches(".bin").split('-').collect();
@@ -29,10 +60,18 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         let end_hash = hex::decode(parts[1]).expect("Invalid hex string in file name");
 
         if target_hash_bytes >= start_hash && end_hash >= target_hash_bytes {
+            println!("Looking inside file: {:?}", entry);
+
+            let start_looking_inside = Instant::now();
             let file_path = format!("{}/{}", directory, file_name);
-            let mut file = File::open(file_path)?;
-            let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer)?;
+            // println!("Opening file: {}", file_path);
+
+            let file = File::open(file_path)?;
+
+            let mmap = unsafe { Mmap::map(&file).expect("Could not memory-map the file") };
+            let buffer: &[u8] = &mmap;
+
+            // file.read_to_end(&mut buffer)?;
 
             // Calculate the number of records expected
             let record_size = 32;
@@ -47,54 +86,115 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
                 continue;
             }
 
-            // Deserialize and search for the target hash
-            for i in 0..num_records {
-                let record_start = i * record_size;
-                let record_end = record_start + record_size;
-                let record_bytes = &buffer[record_start..record_end];
-                let record: Record = match bincode::deserialize(record_bytes) {
+            // Perform binary search
+            let mut left = 0;
+            let mut right = num_records - 1;
+
+            while left <= right {
+                let mid = (left + right) / 2;
+                let mid_record_start = mid * record_size;
+                let mid_record_end = mid_record_start + record_size;
+                let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
+
+                let left_record_start = left * record_size;
+                let left_record_end = left_record_start + record_size;
+                let left_record_bytes = &buffer[left_record_start..left_record_end];
+
+                let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
                     Ok(record) => record,
                     Err(_) => {
                         eprintln!(
                             "Failed to deserialize record at index {} in file {}",
-                            i, file_name
+                            mid, file_name
                         );
-                        continue;
+                        break;
                     }
                 };
 
-                if record.hash == target_hash_bytes.as_slice() {
-                    return Ok(Some(record));
+                let left_record: Record = match bincode::deserialize(left_record_bytes) {
+                    Ok(record) => record,
+                    Err(_) => {
+                        eprintln!(
+                            "Failed to deserialize record at index {} in file {}",
+                            left, file_name
+                        );
+                        break;
+                    }
+                };
+
+                match mid_record.hash.cmp(&target_hash_arr) {
+                    Ordering::Less => left = mid + 1,
+                    Ordering::Greater => {
+                        if mid == 0 {
+                            break;
+                        };
+                        right = mid - 1
+                    }
+                    Ordering::Equal => {
+                        let looking_inside_duration = start_looking_inside.elapsed();
+                        println!(
+                            "(mid_value) Traversing over the contents of a file took: {:?}",
+                            looking_inside_duration
+                        );
+
+                        let entry_string = entry.file_name().to_string_lossy().to_string();
+                        println!("Record is in file: {:?}", entry_string);
+                        return Ok(Some(mid_record));
+                    }
+                }
+
+                match left_record.hash.cmp(&target_hash_arr) {
+                    Ordering::Less => left += 1,
+                    Ordering::Greater => break,
+                    Ordering::Equal => {
+                        let looking_inside_duration = start_looking_inside.elapsed();
+                        println!(
+                            "(left_value) Traversing over the contents of a file took: {:?}",
+                            looking_inside_duration
+                        );
+                        let entry_string = entry.file_name().to_string_lossy().to_string();
+                        println!("Record is in file: {:?}", entry_string);
+                        return Ok(Some(left_record));
+                    }
                 }
             }
+
+            let looking_inside_duration = start_looking_inside.elapsed();
+            println!(
+                "Traversing over the contents of a file took: {:?}",
+                looking_inside_duration
+            );
+
+            // Linear search
+            // for i in 0..num_records {
+            //     let record_start = i * record_size;
+            //     let record_end = record_start + record_size;
+            //     let record_bytes = &buffer[record_start..record_end];
+            //     let record: Record = match bincode::deserialize(record_bytes) {
+            //         Ok(record) => record,
+            //         Err(_) => {
+            //             eprintln!(
+            //                 "Failed to deserialize record at index {} in file {}",
+            //                 i, file_name
+            //             );
+            //             continue;
+            //         }
+            //     };
+
+            //     if record.hash == target_hash_bytes.as_slice() {
+            //         return Ok(Some(record));
+            //     }
+            // }
         }
+
+        let entry_duration = start_entry.elapsed();
+        println!("Going over entry {:?} takes: {:?}", entry, entry_duration);
     }
-    // let file = File::open(directory)?;
-    // let mut reader = BufReader::new(file);
-
-    // let target_hash_bytes = hex::decode(target_hash).expect("Failed to decode hex string");
-    // if target_hash_bytes.len() != HASH_SIZE {
-    //     return Err(io::Error::new(
-    //         io::ErrorKind::InvalidInput,
-    //         "Invalid hash length",
-    //     ));
-    // }
-
-    // let target_hash_array: [u8; HASH_SIZE] = target_hash_bytes
-    //     .try_into()
-    //     .expect("Failed to convert hash to array");
-
-    // while let Ok(record) = bincode::deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
-    //     if record.hash == target_hash_array {
-    //         let nonce_decimal = print_records::nonce_to_decimal(&record.nonce);
-    //         let hash_hex = print_records::hash_to_string(&record.hash);
-    //         return Ok(Some((nonce_decimal, hash_hex)));
-    //     }
-    // }
 
     Ok(None)
 }
 
+// Multi-threaded
 pub fn lookup_hash(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
     let target_hash_bytes = hex::decode(target_hash).expect("Hash couldn't be converted to hex");
 
@@ -104,25 +204,37 @@ pub fn lookup_hash(directory: &str, target_hash: &str) -> io::Result<Option<Reco
         .map(|entry| entry.path())
         .collect();
 
+    // Atomic flag to indicate if the record has been found
+    let record_found = Arc::new(AtomicBool::new(false));
     // Mutex to store the found record
     let found_record = Arc::new(Mutex::new(None));
 
     // Process each file in parallel
     paths.par_iter().for_each(|path| {
-        let mut file = match File::open(path) {
+        if record_found.load(AtomicOrdering::Relaxed) {
+            return; // Early exit if record is already found
+        }
+
+        let file = match File::open(path) {
             Ok(f) => f,
             Err(_) => return,
         };
 
-        let mut buffer = Vec::new();
-        if file.read_to_end(&mut buffer).is_err() {
-            return;
-        }
+        let mmap = unsafe { Mmap::map(&file).expect("Could not memory-map the file") };
+
+        let buffer = &mmap;
+        // if file.read_to_end(&mut buffer).is_err() {
+        //     return;
+        // }
 
         let chunk_size = 32;
         let chunks = buffer.chunks_exact(chunk_size);
 
         for chunk in chunks {
+            if record_found.load(AtomicOrdering::Relaxed) {
+                return; // Early exit if record is already found
+            }
+
             let record: Record = match bincode::deserialize(chunk) {
                 Ok(r) => r,
                 Err(_) => return,
@@ -131,6 +243,7 @@ pub fn lookup_hash(directory: &str, target_hash: &str) -> io::Result<Option<Reco
             if record.hash == target_hash_bytes.as_slice() {
                 let mut found = found_record.lock().unwrap();
                 *found = Some(record);
+                record_found.store(true, AtomicOrdering::Relaxed); // Set the flag to indicate the record has been found
                 return;
             }
         }

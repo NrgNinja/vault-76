@@ -65,7 +65,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("target_hash")
-                .short('h')
+                .short('x')
                 .long("target_hash")
                 .takes_value(true)
                 .help("String hash to lookup from the data"),
@@ -82,7 +82,7 @@ fn main() {
 
     let num_threads = matches
         .value_of("threads")
-        .unwrap_or("4")
+        .unwrap_or("16")
         .parse::<usize>()
         .expect("Please provide a valid number for threads");
 
@@ -187,19 +187,19 @@ fn main() {
     if target_hash != "00000000000000000000000000" {
         let start_lookup_timer = Instant::now();
 
-        // Single-threaded 
-        // match lookup::lookup_hash_in_file(directory, &target_hash) {
-        //     Ok(Some(record)) => println!("Found record: {:?}", record),
-        //     Ok(None) => println!("Hash not found"),
-        //     Err(e) => eprintln!("Error occurred: {}", e),
-        // }
-
-        // Multi-threaded
-        match lookup::lookup_hash(directory, target_hash) {
+        // Single-threaded
+        match lookup::lookup_hash_in_file(directory, &target_hash) {
             Ok(Some(record)) => println!("Found record: {:?}", record),
-            Ok(None) => println!("Record not found"),
+            Ok(None) => println!("Hash not found"),
             Err(e) => eprintln!("Error occurred: {}", e),
         }
+
+        // Multi-threaded
+        // match lookup::lookup_hash(directory, target_hash) {
+        //     Ok(Some(record)) => println!("Found record: {:?}", record),
+        //     Ok(None) => println!("Record not found"),
+        //     Err(e) => eprintln!("Error occurred: {}", e),
+        // }
 
         let lookup_duration = start_lookup_timer.elapsed();
         println!("Looking up {} hash took {:?}", target_hash, lookup_duration);

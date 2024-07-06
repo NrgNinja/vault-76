@@ -19,6 +19,7 @@ serde = { version = "1.0", features = ["derive"] }
 rayon = "1.5.1"
 indicatif = "0.17.8"
 tinyrand-std = "0.5.0"
+memmap2 = "0.9.4"
 
 [profile.release]
 debug = false
