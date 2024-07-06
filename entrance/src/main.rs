@@ -106,7 +106,7 @@ fn main() {
 
     let target_hash = matches
         .value_of("target_hash")
-        .unwrap_or("00000000000000000000000000");
+        .unwrap_or("0");
 
     let directory = "./output";
 
@@ -184,7 +184,7 @@ fn main() {
         }
     }
 
-    if target_hash != "00000000000000000000000000" {
+    if target_hash != "0" {
         let start_lookup_timer = Instant::now();
 
         // Single-threaded

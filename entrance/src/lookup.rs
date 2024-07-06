@@ -17,10 +17,7 @@ use crate::Record;
 // Single-threaded lookup
 pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
     let target_hash_bytes = hex::decode(target_hash).expect("Invalid hex string for target hash");
-    let target_hash_arr: [u8; 26] = target_hash_bytes
-        .as_slice()
-        .try_into()
-        .expect("Invalid array");
+    let target_hash_arr: &[u8] = target_hash_bytes.as_slice();
 
     // Check if the directory exists
     if !fs::metadata(directory).is_ok() {
@@ -28,7 +25,7 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         return Ok(None);
     }
 
-    let start_get_file_names = Instant::now();
+    // Happens quickly - was checked with time()
     let entries = match std::fs::read_dir(directory) {
         Ok(entries) => entries,
         Err(e) => {
@@ -36,11 +33,6 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
             return Ok(None);
         }
     };
-    let get_file_names_duration = start_get_file_names.elapsed();
-    println!(
-        "Extracting directory file names from disk takes: {:?}",
-        get_file_names_duration
-    );
 
     for entry in entries {
         let start_entry = Instant::now();
@@ -59,7 +51,11 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         let start_hash = hex::decode(parts[0]).expect("Invalid hex string in file name");
         let end_hash = hex::decode(parts[1]).expect("Invalid hex string in file name");
 
-        if target_hash_bytes >= start_hash && end_hash >= target_hash_bytes {
+        // Truncate start_hash and end_hash to the length of target_hash_bytes
+        let truncated_start_hash = &start_hash[..target_hash_bytes.len()];
+        let truncated_end_hash = &end_hash[..target_hash_bytes.len()];
+
+        if target_hash_arr >= truncated_start_hash && truncated_end_hash >= target_hash_arr {
             println!("Looking inside file: {:?}", entry);
 
             let start_looking_inside = Instant::now();
@@ -87,75 +83,124 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
             }
 
             // Perform binary search
-            let mut left = 0;
-            let mut right = num_records - 1;
+            // let mut left = 0;
+            // let mut right = num_records - 1;
 
-            while left <= right {
-                let mid = (left + right) / 2;
-                let mid_record_start = mid * record_size;
-                let mid_record_end = mid_record_start + record_size;
-                let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
+            // while left <= right {
+            //     let mid = (left + right) / 2;
+            //     let mid_record_start = mid * record_size;
+            //     let mid_record_end = mid_record_start + record_size;
+            //     let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
 
-                let left_record_start = left * record_size;
-                let left_record_end = left_record_start + record_size;
-                let left_record_bytes = &buffer[left_record_start..left_record_end];
+            //     let left_record_start = left * record_size;
+            //     let left_record_end = left_record_start + record_size;
+            //     let left_record_bytes = &buffer[left_record_start..left_record_end];
 
-                let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
-                    Ok(record) => record,
-                    Err(_) => {
-                        eprintln!(
-                            "Failed to deserialize record at index {} in file {}",
-                            mid, file_name
-                        );
-                        break;
-                    }
-                };
+            //     let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
+            //         Ok(record) => record,
+            //         Err(_) => {
+            //             eprintln!(
+            //                 "Failed to deserialize record at index {} in file {}",
+            //                 mid, file_name
+            //             );
+            //             break;
+            //         }
+            //     };
 
-                let left_record: Record = match bincode::deserialize(left_record_bytes) {
-                    Ok(record) => record,
-                    Err(_) => {
-                        eprintln!(
-                            "Failed to deserialize record at index {} in file {}",
-                            left, file_name
-                        );
-                        break;
-                    }
-                };
+            //     // let left_record: Record = match bincode::deserialize(left_record_bytes) {
+            //     //     Ok(record) => record,
+            //     //     Err(_) => {
+            //     //         eprintln!(
+            //     //             "Failed to deserialize record at index {} in file {}",
+            //     //             left, file_name
+            //     //         );
+            //     //         break;
+            //     //     }
+            //     // };
 
-                match mid_record.hash.cmp(&target_hash_arr) {
-                    Ordering::Less => left = mid + 1,
-                    Ordering::Greater => {
-                        if mid == 0 {
-                            break;
-                        };
-                        right = mid - 1
-                    }
-                    Ordering::Equal => {
-                        let looking_inside_duration = start_looking_inside.elapsed();
-                        println!(
-                            "(mid_value) Traversing over the contents of a file took: {:?}",
-                            looking_inside_duration
-                        );
+            //     // Check if the current record's hash starts with the target hash prefix
+            //     if mid_record.hash.starts_with(&target_hash_bytes) {
+            //         let looking_inside_duration = start_looking_inside.elapsed();
+            //         println!(
+            //             "Traversing over the contents of a file took: {:?}",
+            //             looking_inside_duration
+            //         );
 
-                        let entry_string = entry.file_name().to_string_lossy().to_string();
-                        println!("Record is in file: {:?}", entry_string);
-                        return Ok(Some(mid_record));
-                    }
-                }
+            //         let entry_string = entry.file_name().to_string_lossy().to_string();
+            //         println!("Record is in file: {:?}", entry_string);
+            //         return Ok(Some(mid_record));
+            //     }
 
-                match left_record.hash.cmp(&target_hash_arr) {
-                    Ordering::Less => left += 1,
-                    Ordering::Greater => break,
-                    Ordering::Equal => {
-                        let looking_inside_duration = start_looking_inside.elapsed();
-                        println!(
-                            "(left_value) Traversing over the contents of a file took: {:?}",
-                            looking_inside_duration
-                        );
-                        let entry_string = entry.file_name().to_string_lossy().to_string();
-                        println!("Record is in file: {:?}", entry_string);
-                        return Ok(Some(left_record));
-                    }
+            //     match mid_record.hash.as_slice().cmp(&target_hash_bytes.as_slice()) {
+            //         Ordering::Less => left = mid + 1,
+            //         Ordering::Greater => {
+            //             if mid == 0 {
+            //                 break;
+            //             };
+            //             right = mid - 1
+            //         }
+            //         Ordering::Equal => {
+            //             let looking_inside_duration = start_looking_inside.elapsed();
+            //             println!(
+            //                 "(mid_value) Traversing over the contents of a file took: {:?}",
+            //                 looking_inside_duration
+            //             );
+
+            //             let entry_string = entry.file_name().to_string_lossy().to_string();
+            //             println!("Record is in file: {:?}", entry_string);
+            //             return Ok(Some(mid_record));
+            //         }
+            //     }
+
+            //     // match left_record.hash.cmp(&target_hash_arr) {
+            //     //     Ordering::Less => left += 1,
+            //     //     Ordering::Greater => break,
+            //     //     Ordering::Equal => {
+            //     //         let looking_inside_duration = start_looking_inside.elapsed();
+            //     //         println!(
+            //     //             "(left_value) Traversing over the contents of a file took: {:?}",
+            //     //             looking_inside_duration
+            //     //         );
+            //     //         let entry_string = entry.file_name().to_string_lossy().to_string();
+            //     //         println!("Record is in file: {:?}", entry_string);
+            //     //         return Ok(Some(left_record));
+            //     //     }
+            //     // }
+            // }
+
+            // Linear search for records with prefix match
+            for i in 0..num_records {
+                // let record_start = i * record_size;
+                // let record_end = record_start + record_size;
+                // let record_bytes = &buffer[record_start..record_end];
+                println!(
+                    "Checking record hash: {:?}",
+                    &buffer[i * record_size..(i + 1) * record_size]
+                );
+
+                let record: Record =
+                    match bincode::deserialize(&buffer[i * record_size..(i + 1) * record_size]) {
+                        Ok(record) => record,
+                        Err(_) => {
+                            eprintln!(
+                                "Failed to deserialize record at index {} in file {}",
+                                i, file_name
+                            );
+                            continue;
+                        }
+                    };
+
+                // Check if the current record's hash starts with the target hash prefix
+                if record.hash.starts_with(&target_hash_bytes) {
+                    let looking_inside_duration = start_looking_inside.elapsed();
+                    println!(
+                        "Traversing over the contents of a file took: {:?}",
+                        looking_inside_duration
+                    );
+
+                    let entry_string = entry.file_name().to_string_lossy().to_string();
+                    println!("Record is in file: {:?}", entry_string);
+                    return Ok(Some(record));
                 }
             }
 
@@ -164,27 +209,6 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
                 "Traversing over the contents of a file took: {:?}",
                 looking_inside_duration
             );
-
-            // Linear search
-            // for i in 0..num_records {
-            //     let record_start = i * record_size;
-            //     let record_end = record_start + record_size;
-            //     let record_bytes = &buffer[record_start..record_end];
-            //     let record: Record = match bincode::deserialize(record_bytes) {
-            //         Ok(record) => record,
-            //         Err(_) => {
-            //             eprintln!(
-            //                 "Failed to deserialize record at index {} in file {}",
-            //                 i, file_name
-            //             );
-            //             continue;
-            //         }
-            //     };
-
-            //     if record.hash == target_hash_bytes.as_slice() {
-            //         return Ok(Some(record));
-            //     }
-            // }
         }
 
         let entry_duration = start_entry.elapsed();
