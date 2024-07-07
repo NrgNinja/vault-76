@@ -8,6 +8,7 @@ num_runs=5
 cd ../..
 
 for n in {1..5}; do
+    echo "--------------------------------------Run $n------------------------------------------------"
     free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
     sleep 5
 
@@ -16,6 +17,8 @@ for n in {1..5}; do
 
     total_duration=$(echo "$output" | grep -oP 'Looking up.*hash took \K[0-9]+\.[0-9]+')
     total_time=$(echo "$total_time + $total_duration" | bc)
+
+    echo
 done
 
 average_time=$(echo "scale=3; $total_time / $num_runs" | bc)

@@ -189,8 +189,8 @@ fn main() {
 
         // Single-threaded
         match lookup::lookup_hash_in_file(directory, &target_hash) {
-            Ok(Some(record)) => println!("Found record: {:?}", record),
-            Ok(None) => println!("Hash not found"),
+            Ok(results) => println!("Found records: {:?}", results),
+            // Ok(None) => println!("Hash not found"),
             Err(e) => eprintln!("Error occurred: {}", e),
         }
 

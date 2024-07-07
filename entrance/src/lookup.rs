@@ -15,14 +15,17 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use crate::Record;
 
 // Single-threaded lookup
-pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
+pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Vec<Record>> {
     let target_hash_bytes = hex::decode(target_hash).expect("Invalid hex string for target hash");
     let target_hash_arr: &[u8] = target_hash_bytes.as_slice();
+    let target_hash_len = target_hash_bytes.len();
+
+    let mut results: Vec<Record> = Vec::new();
 
     // Check if the directory exists
     if !fs::metadata(directory).is_ok() {
         eprintln!("Directory does not exist: {}", directory);
-        return Ok(None);
+        return Ok(results);
     }
 
     // Happens quickly - was checked with time()
@@ -30,7 +33,7 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         Ok(entries) => entries,
         Err(e) => {
             eprintln!("Failed to read directory: {}", e);
-            return Ok(None);
+            return Ok(results);
         }
     };
 
@@ -52,22 +55,18 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         let end_hash = hex::decode(parts[1]).expect("Invalid hex string in file name");
 
         // Truncate start_hash and end_hash to the length of target_hash_bytes
-        let truncated_start_hash = &start_hash[..target_hash_bytes.len()];
-        let truncated_end_hash = &end_hash[..target_hash_bytes.len()];
+        let truncated_start_hash = &start_hash[..target_hash_len];
+        let truncated_end_hash = &end_hash[..target_hash_len];
 
         if target_hash_arr >= truncated_start_hash && truncated_end_hash >= target_hash_arr {
-            println!("Looking inside file: {:?}", entry);
-
             let start_looking_inside = Instant::now();
             let file_path = format!("{}/{}", directory, file_name);
-            // println!("Opening file: {}", file_path);
+            println!("Opening file: {}", file_path);
 
             let file = File::open(file_path)?;
 
             let mmap = unsafe { Mmap::map(&file).expect("Could not memory-map the file") };
             let buffer: &[u8] = &mmap;
-
-            // file.read_to_end(&mut buffer)?;
 
             // Calculate the number of records expected
             let record_size = 32;
@@ -92,9 +91,9 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
             //     let mid_record_end = mid_record_start + record_size;
             //     let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
 
-            //     let left_record_start = left * record_size;
-            //     let left_record_end = left_record_start + record_size;
-            //     let left_record_bytes = &buffer[left_record_start..left_record_end];
+            //     // let left_record_start = left * record_size;
+            //     // let left_record_end = left_record_start + record_size;
+            //     // let left_record_bytes = &buffer[left_record_start..left_record_end];
 
             //     let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
             //         Ok(record) => record,
@@ -119,7 +118,7 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
             //     // };
 
             //     // Check if the current record's hash starts with the target hash prefix
-            //     if mid_record.hash.starts_with(&target_hash_bytes) {
+            //     if mid_record.hash[..target_hash_len].starts_with(&target_hash_bytes) {
             //         let looking_inside_duration = start_looking_inside.elapsed();
             //         println!(
             //             "Traversing over the contents of a file took: {:?}",
@@ -128,10 +127,10 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
 
             //         let entry_string = entry.file_name().to_string_lossy().to_string();
             //         println!("Record is in file: {:?}", entry_string);
-            //         return Ok(Some(mid_record));
+            //         results.push(mid_record);
             //     }
 
-            //     match mid_record.hash.as_slice().cmp(&target_hash_bytes.as_slice()) {
+            //     match mid_record.hash[..target_hash_len].cmp(&target_hash_bytes.as_slice()) {
             //         Ordering::Less => left = mid + 1,
             //         Ordering::Greater => {
             //             if mid == 0 {
@@ -148,24 +147,24 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
 
             //             let entry_string = entry.file_name().to_string_lossy().to_string();
             //             println!("Record is in file: {:?}", entry_string);
-            //             return Ok(Some(mid_record));
+            //             results.push(mid_record);
             //         }
             //     }
 
-            //     // match left_record.hash.cmp(&target_hash_arr) {
-            //     //     Ordering::Less => left += 1,
-            //     //     Ordering::Greater => break,
-            //     //     Ordering::Equal => {
-            //     //         let looking_inside_duration = start_looking_inside.elapsed();
-            //     //         println!(
-            //     //             "(left_value) Traversing over the contents of a file took: {:?}",
-            //     //             looking_inside_duration
-            //     //         );
-            //     //         let entry_string = entry.file_name().to_string_lossy().to_string();
-            //     //         println!("Record is in file: {:?}", entry_string);
-            //     //         return Ok(Some(left_record));
-            //     //     }
-            //     // }
+            // match left_record.hash.cmp(&target_hash_arr) {
+            //     Ordering::Less => left += 1,
+            //     Ordering::Greater => break,
+            //     Ordering::Equal => {
+            //         let looking_inside_duration = start_looking_inside.elapsed();
+            //         println!(
+            //             "(left_value) Traversing over the contents of a file took: {:?}",
+            //             looking_inside_duration
+            //         );
+            //         let entry_string = entry.file_name().to_string_lossy().to_string();
+            //         println!("Record is in file: {:?}", entry_string);
+            //         return Ok(Some(left_record));
+            //     }
+            // }
             // }
 
             // Linear search for records with prefix match
@@ -173,10 +172,10 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
                 // let record_start = i * record_size;
                 // let record_end = record_start + record_size;
                 // let record_bytes = &buffer[record_start..record_end];
-                println!(
-                    "Checking record hash: {:?}",
-                    &buffer[i * record_size..(i + 1) * record_size]
-                );
+                // println!(
+                //     "Checking record hash: {:?}",
+                //     &buffer[i * record_size..(i + 1) * record_size]
+                // );
 
                 let record: Record =
                     match bincode::deserialize(&buffer[i * record_size..(i + 1) * record_size]) {
@@ -200,7 +199,8 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
 
                     let entry_string = entry.file_name().to_string_lossy().to_string();
                     println!("Record is in file: {:?}", entry_string);
-                    return Ok(Some(record));
+                    results.push(record);
+                    // return Ok(Some(record));
                 }
             }
 
@@ -215,7 +215,7 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         println!("Going over entry {:?} takes: {:?}", entry, entry_duration);
     }
 
-    Ok(None)
+    Ok(results)
 }
 
 // Multi-threaded
