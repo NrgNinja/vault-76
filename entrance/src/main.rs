@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 mod hash_generator;
+mod lookup;
 mod print_records;
 mod store_hashes;
-mod lookup;
 
 #[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,10 +77,12 @@ fn main() {
         )
         .get_matches();
 
-    // Extract values from the command line
+    // determine if lookup is specified, otherwise continue normal vault operations
     if let Some(lookup_value) = matches.value_of("lookup") {
         // Lookup functionality
-        if let Err(e) = lookup::lookup_by_prefix(matches.value_of("filename").unwrap_or(""), lookup_value) {
+        if let Err(e) =
+            lookup::lookup_by_prefix(matches.value_of("filename").unwrap_or(""), lookup_value)
+        {
             eprintln!("Error during lookup: {}", e);
         }
         return;
@@ -159,7 +161,7 @@ fn main() {
 
     let generation_start = Instant::now();
 
-    // generate hashes in parallel (if using multiple threads)
+    // generate hashes in parallel and store them into a DashMap data structure
     (0..num_records)
         .into_par_iter()
         .map(|nonce| hash_generator::generate_hash(nonce, prefix_length))
@@ -175,6 +177,7 @@ fn main() {
 
     let storage_start = Instant::now();
 
+    // if an output file is specified by the command line, it will write to that file
     if !output_file.is_empty() {
         let _ = store_hashes::store_hashes_dashmap(&map, output_file);
     }
@@ -208,6 +211,7 @@ fn main() {
         total_records, num_keys, num_threads, total_duration
     );
 
+    // if you specify a number of records to print to the screen; for debugging purposes
     if let Some(num_records_to_print) = matches
         .value_of("print")
         .map(|v| v.parse::<usize>().unwrap())
