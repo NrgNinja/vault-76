@@ -5,6 +5,9 @@ use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 mod hash_generator;
@@ -147,6 +150,17 @@ fn main() {
         // Calls store_hashes function to serialize generated hashes into binary and store them on disk
         if writing_on {
             let start_store_output_timer: Instant = Instant::now();
+            let index_file_path = "output/file_index.bin";
+
+            // Open index file once outside of the parallel loop
+            let index_file = Arc::new(Mutex::new(
+                OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .append(true)
+                    .open(index_file_path)
+                    .expect("Failed to open index file"),
+            ));
 
             hashes
                 .par_chunks(chunk_size)
@@ -159,9 +173,16 @@ fn main() {
                     let offset = (i * chunk_size) as u64 * 32;
                     store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
                         .expect("Failed to store hashes");
+
+                    // Write to index file
+                    let mut index_file = index_file.lock().unwrap();
+                    let line_to_write =
+                        format!("{} {} {}\n", &chunk_filename, &first_hash, &last_hash);
+                    index_file
+                        .write_all(line_to_write.as_bytes())
+                        .expect("Failed to write to index file");
                 });
 
-            let index_file_path = "output/file_index.bin";
             let _ = print_records::print_index_file(index_file_path);
 
             let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();

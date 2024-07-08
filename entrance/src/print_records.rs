@@ -101,5 +101,7 @@ pub fn print_index_file(index_file_path: &str) -> io::Result<()> {
         println!("{}", line?);
     }
 
+    println!("Done printing file_index.bin");
+
     Ok(())
 }

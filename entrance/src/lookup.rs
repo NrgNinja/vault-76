@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    fs::{self, DirEntry, File},
+    fs::{DirEntry, File},
     io::{self, BufRead, BufReader},
     sync::{
         atomic::{AtomicBool, Ordering as AtomicOrdering},
@@ -11,11 +11,12 @@ use std::{
 
 use memmap2::Mmap;
 use rayon::iter::{
-    IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
+    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
 
 use crate::{Record, RECORD_SIZE};
 
+#[derive(Debug)]
 struct FileIndexEntry {
     filename: String,
     start_hash: Vec<u8>,
@@ -162,9 +163,12 @@ fn read_file_index(directory: &str) -> io::Result<Vec<FileIndexEntry>> {
 
     for line in reader.lines() {
         let line = line?;
-        println!("{}", line);
-        let parts: Vec<&str> = line.split_whitespace().collect();
+        let line_trimmed = line.trim();
+        println!("Line that was extracted from file_index.bin: {}", line_trimmed);
+
+        let parts: Vec<&str> = line_trimmed.split_whitespace().collect();
         if parts.len() == 3 {
+            println!("Parts: {:?}", parts);
             let filename = parts[0].to_string();
             let start_hash = hex::decode(parts[1]).expect("Invalid hex string in file index");
             let end_hash = hex::decode(parts[2]).expect("Invalid hex string in file index");
@@ -173,8 +177,12 @@ fn read_file_index(directory: &str) -> io::Result<Vec<FileIndexEntry>> {
                 start_hash,
                 end_hash,
             });
+        } else {
+            eprintln!("Skipping line due to incorrect format: {}", line_trimmed);
+        
         }
     }
+    println!("File index contents: {:?}", index_entries);
 
     Ok(index_entries)
 }
