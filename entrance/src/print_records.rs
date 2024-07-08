@@ -1,7 +1,7 @@
 use crate::Record;
 use bincode::deserialize_from;
 use std::fs::File;
-use std::io::{self, BufReader};
+use std::io::{self, BufRead, BufReader};
 
 pub fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
     let mut num: u64 = 0;
@@ -86,6 +86,19 @@ pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> 
         if counter >= num_records_print {
             break;
         }
+    }
+
+    Ok(())
+}
+
+pub fn print_index_file(index_file_path: &str) -> io::Result<()> {
+    let file = File::open(index_file_path)?;
+    let reader = io::BufReader::new(file);
+
+    println!("Contents of file_index.bin:");
+
+    for line in reader.lines() {
+        println!("{}", line?);
     }
 
     Ok(())

@@ -1,7 +1,7 @@
 use std::{
     cmp::Ordering,
-    fs::{self, File},
-    io,
+    fs::{self, DirEntry, File},
+    io::{self, BufRead, BufReader},
     sync::{
         atomic::{AtomicBool, Ordering as AtomicOrdering},
         Arc, Mutex,
@@ -10,58 +10,75 @@ use std::{
 };
 
 use memmap2::Mmap;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{
+    IntoParallelIterator, IntoParallelRefIterator, ParallelBridge, ParallelIterator,
+};
 
-use crate::Record;
+use crate::{Record, RECORD_SIZE};
+
+struct FileIndexEntry {
+    filename: String,
+    start_hash: Vec<u8>,
+    end_hash: Vec<u8>,
+}
 
 // Single-threaded lookup
-pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Vec<Record>> {
+pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Option<Record>> {
     let target_hash_bytes = hex::decode(target_hash).expect("Invalid hex string for target hash");
     let target_hash_arr: &[u8] = target_hash_bytes.as_slice();
     let target_hash_len = target_hash_bytes.len();
 
-    let mut results: Vec<Record> = Vec::new();
+    let file_index = read_file_index(directory)?;
 
     // Check if the directory exists
-    if !fs::metadata(directory).is_ok() {
-        eprintln!("Directory does not exist: {}", directory);
-        return Ok(results);
-    }
+    // if !fs::metadata(directory).is_ok() {
+    //     eprintln!("Directory does not exist: {}", directory);
+    //     return Ok(None);
+    // }
 
-    // Happens quickly - was checked with time()
-    let entries = match std::fs::read_dir(directory) {
-        Ok(entries) => entries,
-        Err(e) => {
-            eprintln!("Failed to read directory: {}", e);
-            return Ok(results);
-        }
-    };
+    // Very slow!!!!!
+    // let get_file_names_start = Instant::now();
+    // let entries: Vec<DirEntry> = match std::fs::read_dir(directory) {
+    //     Ok(entries) => entries.filter_map(Result::ok).collect(),
+    //     Err(e) => {
+    //         eprintln!("Failed to read directory: {}", e);
+    //         return Ok(None);
+    //     }
+    // };
+    // let entries: Vec<DirEntry> = fs::read_dir(directory)?
+    //     .par_bridge()
+    //     .filter_map(Result::ok)
+    //     .collect();
+    // let get_file_names_duration = get_file_names_start.elapsed();
+    // println!(
+    //     "All the files names acquired in {:?}",
+    //     get_file_names_duration
+    // );
 
-    for entry in entries {
-        let start_entry = Instant::now();
-        let entry = entry?;
-        let file_name = entry.file_name();
-        let file_name = file_name.to_str().unwrap();
+    for entry in file_index {
+        // let start_entry = Instant::now();
+        // let file_name = entry.file_name();
+        // let file_name = file_name.to_str().unwrap();
 
-        // println!("Checking file: {}", file_name);
+        println!("Checking file: {}", entry.filename);
 
         // Extract the hash range from the file name
-        let parts: Vec<&str> = file_name.trim_end_matches(".bin").split('-').collect();
-        if parts.len() != 2 {
-            continue;
-        }
+        // let parts: Vec<&str> = file_name.trim_end_matches(".bin").split('-').collect();
+        // if parts.len() != 2 {
+        //     continue;
+        // }
 
-        let start_hash = hex::decode(parts[0]).expect("Invalid hex string in file name");
-        let end_hash = hex::decode(parts[1]).expect("Invalid hex string in file name");
+        // let start_hash = hex::decode(parts[0]).expect("Invalid hex string in file name");
+        // let end_hash = hex::decode(parts[1]).expect("Invalid hex string in file name");
 
         // Truncate start_hash and end_hash to the length of target_hash_bytes
-        let truncated_start_hash = &start_hash[..target_hash_len];
-        let truncated_end_hash = &end_hash[..target_hash_len];
+        let truncated_start_hash = &entry.start_hash[..target_hash_len];
+        let truncated_end_hash = &entry.end_hash[..target_hash_len];
 
         if target_hash_arr >= truncated_start_hash && truncated_end_hash >= target_hash_arr {
-            let start_looking_inside = Instant::now();
-            let file_path = format!("{}/{}", directory, file_name);
-            println!("Opening file: {}", file_path);
+            // let start_looking_inside = Instant::now();
+            let file_path = format!("{}/{}", directory, entry.filename);
+            // println!("Opening file: {}", files_path);
 
             let file = File::open(file_path)?;
 
@@ -69,153 +86,240 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Vec
             let buffer: &[u8] = &mmap;
 
             // Calculate the number of records expected
-            let record_size = 32;
-            let num_records = buffer.len() / record_size;
+            let num_records = buffer.len() / RECORD_SIZE;
 
             // Check if the buffer size is a multiple of the record size
-            if buffer.len() % record_size != 0 {
+            if buffer.len() % RECORD_SIZE != 0 {
                 eprintln!(
                     "Warning: File {} size is not a multiple of record size.",
-                    file_name
+                    entry.filename
                 );
                 continue;
             }
 
             // Perform binary search
-            // let mut left = 0;
-            // let mut right = num_records - 1;
+            let binary_search_start: Instant = Instant::now();
+            if let Some(found_record) = binary_search(
+                num_records,
+                buffer,
+                target_hash_len,
+                &target_hash_bytes,
+                // start_looking_inside,
+            ) {
+                let binary_search_duration = binary_search_start.elapsed();
+                println!("Binary search took: {:?}", binary_search_duration);
+                return Ok(Some(found_record));
+            }
 
-            // while left <= right {
-            //     let mid = (left + right) / 2;
-            //     let mid_record_start = mid * record_size;
-            //     let mid_record_end = mid_record_start + record_size;
-            //     let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
-
-            //     // let left_record_start = left * record_size;
-            //     // let left_record_end = left_record_start + record_size;
-            //     // let left_record_bytes = &buffer[left_record_start..left_record_end];
-
-            //     let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
-            //         Ok(record) => record,
-            //         Err(_) => {
-            //             eprintln!(
-            //                 "Failed to deserialize record at index {} in file {}",
-            //                 mid, file_name
-            //             );
-            //             break;
-            //         }
-            //     };
-
-            //     // let left_record: Record = match bincode::deserialize(left_record_bytes) {
-            //     //     Ok(record) => record,
-            //     //     Err(_) => {
-            //     //         eprintln!(
-            //     //             "Failed to deserialize record at index {} in file {}",
-            //     //             left, file_name
-            //     //         );
-            //     //         break;
-            //     //     }
-            //     // };
-
-            //     // Check if the current record's hash starts with the target hash prefix
-            //     if mid_record.hash[..target_hash_len].starts_with(&target_hash_bytes) {
-            //         let looking_inside_duration = start_looking_inside.elapsed();
-            //         println!(
-            //             "Traversing over the contents of a file took: {:?}",
-            //             looking_inside_duration
-            //         );
-
-            //         let entry_string = entry.file_name().to_string_lossy().to_string();
-            //         println!("Record is in file: {:?}", entry_string);
-            //         results.push(mid_record);
-            //     }
-
-            //     match mid_record.hash[..target_hash_len].cmp(&target_hash_bytes.as_slice()) {
-            //         Ordering::Less => left = mid + 1,
-            //         Ordering::Greater => {
-            //             if mid == 0 {
-            //                 break;
-            //             };
-            //             right = mid - 1
-            //         }
-            //         Ordering::Equal => {
-            //             let looking_inside_duration = start_looking_inside.elapsed();
-            //             println!(
-            //                 "(mid_value) Traversing over the contents of a file took: {:?}",
-            //                 looking_inside_duration
-            //             );
-
-            //             let entry_string = entry.file_name().to_string_lossy().to_string();
-            //             println!("Record is in file: {:?}", entry_string);
-            //             results.push(mid_record);
-            //         }
-            //     }
-
-            // match left_record.hash.cmp(&target_hash_arr) {
-            //     Ordering::Less => left += 1,
-            //     Ordering::Greater => break,
-            //     Ordering::Equal => {
-            //         let looking_inside_duration = start_looking_inside.elapsed();
-            //         println!(
-            //             "(left_value) Traversing over the contents of a file took: {:?}",
-            //             looking_inside_duration
-            //         );
-            //         let entry_string = entry.file_name().to_string_lossy().to_string();
-            //         println!("Record is in file: {:?}", entry_string);
-            //         return Ok(Some(left_record));
-            //     }
-            // }
+            // Parallel binary search
+            // let parallel_binary_search_start: Instant = Instant::now();
+            // if let Some(found_record) = parallel_binary_search(
+            //     num_records,
+            //     buffer,
+            //     file_name,
+            //     target_hash_len,
+            //     &target_hash_bytes,
+            // ) {
+            //     let parallel_binary_search_duration = parallel_binary_search_start.elapsed();
+            //     println!(
+            //         "Parallel binary search took: {:?}",
+            //         parallel_binary_search_duration
+            //     );
+            //     return Ok(Some(found_record));
             // }
 
             // Linear search for records with prefix match
-            for i in 0..num_records {
-                // let record_start = i * record_size;
-                // let record_end = record_start + record_size;
-                // let record_bytes = &buffer[record_start..record_end];
-                // println!(
-                //     "Checking record hash: {:?}",
-                //     &buffer[i * record_size..(i + 1) * record_size]
-                // );
+            // results = linear_search(
+            //     num_records,
+            //     file_name,
+            //     buffer,
+            //     &entry,
+            //     &mut results,
+            //     &target_hash_bytes,
+            //     start_looking_inside,
+            // );
 
-                let record: Record =
-                    match bincode::deserialize(&buffer[i * record_size..(i + 1) * record_size]) {
-                        Ok(record) => record,
-                        Err(_) => {
-                            eprintln!(
-                                "Failed to deserialize record at index {} in file {}",
-                                i, file_name
-                            );
-                            continue;
-                        }
-                    };
-
-                // Check if the current record's hash starts with the target hash prefix
-                if record.hash.starts_with(&target_hash_bytes) {
-                    let looking_inside_duration = start_looking_inside.elapsed();
-                    println!(
-                        "Traversing over the contents of a file took: {:?}",
-                        looking_inside_duration
-                    );
-
-                    let entry_string = entry.file_name().to_string_lossy().to_string();
-                    println!("Record is in file: {:?}", entry_string);
-                    results.push(record);
-                    // return Ok(Some(record));
-                }
-            }
-
-            let looking_inside_duration = start_looking_inside.elapsed();
-            println!(
-                "Traversing over the contents of a file took: {:?}",
-                looking_inside_duration
-            );
+            // let looking_inside_duration = start_looking_inside.elapsed();
+            // println!(
+            //     "Traversing over the contents of a file took: {:?}",
+            //     looking_inside_duration
+            // );
         }
 
-        let entry_duration = start_entry.elapsed();
-        println!("Going over entry {:?} takes: {:?}", entry, entry_duration);
+        // let entry_duration = start_entry.elapsed();
+        // println!("Going over entry {:?} takes: {:?}", entry, entry_duration);
     }
 
-    Ok(results)
+    Ok(None)
+}
+
+fn read_file_index(directory: &str) -> io::Result<Vec<FileIndexEntry>> {
+    let file_path = format!("{}/file_index.bin", directory);
+    let file = File::open(file_path)?;
+    let reader = BufReader::new(file);
+
+    let mut index_entries = Vec::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        println!("{}", line);
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() == 3 {
+            let filename = parts[0].to_string();
+            let start_hash = hex::decode(parts[1]).expect("Invalid hex string in file index");
+            let end_hash = hex::decode(parts[2]).expect("Invalid hex string in file index");
+            index_entries.push(FileIndexEntry {
+                filename,
+                start_hash,
+                end_hash,
+            });
+        }
+    }
+
+    Ok(index_entries)
+}
+
+fn linear_search(
+    num_records: usize,
+    file_name: &str,
+    buffer: &[u8],
+    entry: &DirEntry,
+    results: &mut Vec<Record>,
+    target_hash_bytes: &Vec<u8>,
+    // start_looking_inside: Instant,
+) -> Vec<Record> {
+    for i in 0..num_records {
+        // let record_start = i * record_size;
+        // let record_end = record_start + record_size;
+        // let record_bytes = &buffer[record_start..record_end];
+        // println!(
+        //     "Checking record hash: {:?}",
+        //     &buffer[i * record_size..(i + 1) * record_size]
+        // );
+
+        let record: Record =
+            match bincode::deserialize(&buffer[i * RECORD_SIZE..(i + 1) * RECORD_SIZE]) {
+                Ok(record) => record,
+                Err(_) => {
+                    eprintln!(
+                        "Failed to deserialize record at index {} in file {}",
+                        i, file_name
+                    );
+                    continue;
+                }
+            };
+
+        // Check if the current record's hash starts with the target hash prefix
+        if record.hash.starts_with(&target_hash_bytes) {
+            // let looking_inside_duration = start_looking_inside.elapsed();
+            // println!(
+            //     "Traversing over the contents of a file took: {:?}",
+            //     looking_inside_duration
+            // );
+
+            let entry_string = entry.file_name().to_string_lossy().to_string();
+            println!("Record is in file: {:?}", entry_string);
+            results.push(record);
+            // return Ok(Some(record));
+        }
+    }
+
+    results.to_vec()
+}
+
+fn parallel_binary_search(
+    num_records: usize,
+    buffer: &[u8],
+    file_name: &str,
+    target_hash_len: usize,
+    target_hash_bytes: &[u8],
+) -> Option<Record> {
+    let chunk_size = 1024;
+    let num_chunks = (num_records + chunk_size - 1) / chunk_size;
+
+    (0..num_chunks).into_par_iter().find_map_any(|chunk_index| {
+        let mut left = chunk_index * chunk_size; // chunk_start
+        let mut right = (left + chunk_size).min(num_records) - 1; // chunk_end
+
+        while left <= right {
+            let mid = (left + right) / 2;
+            let mid_record_start = mid * RECORD_SIZE;
+            let mid_record_end = mid_record_start + RECORD_SIZE;
+            let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
+
+            let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
+                Ok(record) => record,
+                Err(_) => {
+                    eprintln!(
+                        "Failed to deserialize record at index {} in file {}",
+                        mid, file_name
+                    );
+                    break;
+                }
+            };
+
+            match mid_record.hash[..target_hash_len].cmp(&target_hash_bytes[..]) {
+                Ordering::Less => left = mid + 1,
+                Ordering::Greater => {
+                    if mid == 0 {
+                        break;
+                    }
+                    right = mid - 1;
+                }
+                Ordering::Equal => return Some(mid_record),
+            }
+        }
+        None
+    })
+}
+
+fn binary_search(
+    num_records: usize,
+    buffer: &[u8],
+    target_hash_len: usize,
+    target_hash_bytes: &Vec<u8>,
+    // start_looking_inside: Instant,
+) -> Option<Record> {
+    let mut left = 0;
+    let mut right = num_records - 1;
+
+    while left <= right {
+        let mid = (left + right) / 2;
+        let mid_record_start = mid * RECORD_SIZE;
+        let mid_record_end = mid_record_start + RECORD_SIZE;
+        let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
+
+        let mid_record: Record = match bincode::deserialize(mid_record_bytes) {
+            Ok(record) => record,
+            Err(_) => {
+                eprintln!("Failed to deserialize record at index {}", mid);
+                break;
+            }
+        };
+
+        match mid_record.hash[..target_hash_len].cmp(&target_hash_bytes.as_slice()) {
+            Ordering::Less => left = mid + 1,
+            Ordering::Greater => {
+                if mid == 0 {
+                    break;
+                };
+                right = mid - 1
+            }
+            Ordering::Equal => {
+                // let entry_string = entry.file_name().to_string_lossy().to_string();
+                // println!("Record is in file: {:?}", entry_string);
+                return Some(mid_record);
+
+                //     let looking_inside_duration = start_looking_inside.elapsed();
+                //     println!(
+                //         "(mid_value) Traversing over the contents of a file took: {:?}",
+                //         looking_inside_duration
+                //     );
+            }
+        }
+    }
+
+    return None;
 }
 
 // Multi-threaded

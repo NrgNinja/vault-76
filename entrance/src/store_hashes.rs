@@ -27,5 +27,17 @@ pub fn store_hashes_chunk(chunk: &[Record], filename: &str, offset: u64) -> io::
     file.seek(SeekFrom::Start(offset))?;
     file.write_all(&buffer)?;
 
+    let index_path = "output/file_index.bin";
+    let mut index_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(index_path)?;
+
+    let first_hash = hex::encode(chunk.first().unwrap().hash);
+    let last_hash = hex::encode(chunk.last().unwrap().hash);
+
+    writeln!(index_file, "{} {} {}", filename, first_hash, last_hash)?;
+
     Ok(())
 }

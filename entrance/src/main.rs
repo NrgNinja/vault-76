@@ -15,6 +15,7 @@ mod store_hashes;
 
 pub const NONCE_SIZE: usize = 6;
 pub const HASH_SIZE: usize = 26;
+pub const RECORD_SIZE: usize = 32;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct Record {
@@ -104,9 +105,7 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
 
-    let target_hash = matches
-        .value_of("target_hash")
-        .unwrap_or("0");
+    let target_hash = matches.value_of("target_hash").unwrap_or("0");
 
     let directory = "./output";
 
@@ -161,6 +160,9 @@ fn main() {
                     store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
                         .expect("Failed to store hashes");
                 });
+
+            let index_file_path = "output/file_index.bin";
+            let _ = print_records::print_index_file(index_file_path);
 
             let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
             println!("Writing hashes to disk took {:?}", store_output_duration);
