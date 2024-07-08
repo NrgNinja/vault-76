@@ -7,7 +7,7 @@ use std::convert::TryInto;
 const HASH_SIZE: usize = 26;
 
 // this method uses prefix extraction & returns the hash with its prefix for storage in DashMap
-#[inline(always)]
+#[inline]
 pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
     let nonce_bytes = nonce.to_be_bytes();
     let mut hasher = Hasher::new();
