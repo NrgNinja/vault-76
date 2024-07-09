@@ -14,7 +14,12 @@ sleep 3
 echo "Cleaning the output directory..."
 rm -rf "${output_dir:?}"/*
 
+sar -u 1 > stats/cpu/cpu-stats_$k$threads.txt &
+sar -b 1 > stats/io/io-stats_$k$threads.txt &
+sar -r 1 > stats/memory/memory-stats_$k$threads.txt &
+
 ./target/release/entrance -k $k -t $threads -p 10
+pkill sar
 
 file_size=$(du -hs $output_dir)
 echo "The total size of all files is $file_size"
