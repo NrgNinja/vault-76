@@ -183,7 +183,7 @@ fn main() {
                         .expect("Failed to write to index file");
                 });
 
-            let _ = print_records::print_index_file(index_file_path);
+            // let _ = print_records::print_index_file(index_file_path);
 
             let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
             println!("Writing hashes to disk took {:?}", store_output_duration);

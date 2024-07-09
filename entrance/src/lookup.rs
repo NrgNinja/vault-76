@@ -25,7 +25,7 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
     let file_index = read_file_index(directory)?;
 
     for entry in file_index {
-        println!("Checking file: {}", entry.filename);
+        // println!("Checking file: {}", entry.filename);
 
         // Truncate start_hash and end_hash to the length of target_hash_bytes
         let truncated_start_hash = &entry.start_hash[..target_hash_len];
