@@ -11,7 +11,7 @@ mod print_records;
 mod store_hashes;
 
 #[allow(dead_code)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 
 struct Record {
     nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
@@ -187,24 +187,22 @@ fn main() {
 
     let total_duration = generation_duration + storage_duration;
 
-    // snippet to check the contents of the map
+    // check the contents of the map
     let num_keys = map.len();
-    // println!("Total number of unique prefix buckets: {}", num_keys);
-
-    // let average_records_per_key =
-    //     map.iter().map(|entry| entry.value().len()).sum::<usize>() as f64 / num_keys as f64;
-    // println!(
-    //     "Average number of records per prefix bucket: {:.2}",
-    //     average_records_per_key
-    // );
-
     let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
-    // println!("Total number of records stored: {}", total_records);
 
     // if you want to see details of each bucket, uncomment the following lines
-    // map.iter().for_each(|entry| {
-    //     println!("Prefix bucket {} has {} records", *entry.key(), entry.value().len());
-    // });
+    // let mut keys_with_counts: Vec<(u64, usize)> = map
+    //     .iter()
+    //     .map(|entry| (*entry.key(), entry.value().len()))
+    //     .collect();
+
+    // keys_with_counts.sort_by_key(|k| k.0);
+
+    // for (key, count) in keys_with_counts {
+    //     let prefix_hex = format!("{:x}", key); // convert numeric prefix to hex
+    //     println!("Prefix bucket {} has {} records", prefix_hex, count);
+    // }
 
     println!(
         "Time taken for {} parallel insertions into {} buckets using {} threads: {:?}",

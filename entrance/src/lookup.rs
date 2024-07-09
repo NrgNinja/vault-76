@@ -19,7 +19,7 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
     reader.seek(SeekFrom::Start(offset))?;
 
     // for easier human readability
-    println!("{:<20} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
+    println!("{:<16} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
     println!("{}", "-".repeat(88));
 
     while let Some(record) = deserialize_next_record(&mut reader)? {
@@ -27,7 +27,7 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
             count += 1;
             let nonce_decimal = nonce_to_decimal(&record.nonce);
             let hash_hex = hash_to_string(&record.hash);
-            println!("{:<20} | {}", nonce_decimal, hash_hex);
+            println!("{:<16} | {}", nonce_decimal, hash_hex);
         }
     }
 

@@ -21,10 +21,16 @@ for n in {1..3}; do
     free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
     sleep 3
 
+    sar -u 1 > output/cpu-stats_$n.txt &
+    sar -b 1 > output/io-stats_$n.txt &
+
     echo "----------------------------------------Run $n---------------------------------------------"
 
     # Run the program and capture the output
     output=$(./target/release/entrance -k $k -t $threads -f "${output_dir}/output.bin")
+
+    # Kill the sar process
+    pkill sar
     echo "$output"
 
     # Extract and accumulate the time taken for generating and storing hashes
@@ -41,6 +47,7 @@ for n in {1..3}; do
 
     echo
 done
+
 
 echo "----------------------------------------Results---------------------------------------------"
 

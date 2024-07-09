@@ -18,21 +18,32 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
 // function to deserialize and print a specified number of records from a DashMap
 pub fn print_records_dashmap(map: &DashMap<u64, Vec<Record>>, num_records_to_print: usize) {
     println!("Here are the first {} records:", num_records_to_print);
-    println!("{:<20} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
-    println!("{}", "-".repeat(88)); // separator line
+    println!(
+        "{:<16} | {:<10} | {:<64}",
+        "Nonce (Decimal)", "Prefix (Hex)", "Hash (Hex)"
+    );
+    println!("{}", "-".repeat(100)); // Separator line
 
     let mut printed = 0;
 
-    'outer: for record_vec in map.iter() {
-        for record in record_vec.value() {
-            let nonce_decimal = nonce_to_decimal(&record.nonce);
-            let hash_hex = hash_to_string(&record.hash);
+    let mut keys_with_records: Vec<(u64, Vec<Record>)> = map
+        .iter()
+        .map(|entry| (*entry.key(), entry.value().clone()))
+        .collect();
 
-            println!("{:<20} | {}", nonce_decimal, hash_hex);
-            printed += 1;
+    // sort by keys to ensure records are printed in the order of their prefixes
+    keys_with_records.sort_by_key(|k| k.0);
+
+    'outer: for (prefix, records) in keys_with_records {
+        for record in records {
             if printed >= num_records_to_print {
                 break 'outer;
             }
+            let nonce_decimal = nonce_to_decimal(&record.nonce);
+            let hash_hex = hash_to_string(&record.hash);
+            let prefix_hex = format!("{:04x}", prefix);
+            println!("{:<16} | {:<12} | {}", nonce_decimal, prefix_hex, hash_hex);
+            printed += 1;
         }
     }
 }

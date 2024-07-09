@@ -16,7 +16,7 @@ pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
     let hash = hasher.finalize();
     let hash_bytes = hash.as_bytes();
 
-    // prefix of desired lenghth is extracted using bitshifting from left to right
+    // prefix of desired length is extracted using bitshifting from left to right
     let mut prefix = 0u64;
     for i in 0..prefix_length.min(8) {
         prefix <<= 8;
