@@ -1,7 +1,7 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
 use rand::random;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
@@ -162,26 +162,21 @@ fn main() {
                     .expect("Failed to open index file"),
             ));
 
-            hashes
-                .par_chunks(chunk_size)
-                .enumerate()
-                .for_each(|(i, chunk)| {
-                    let first_hash = hex::encode(chunk.first().unwrap().hash);
-                    let last_hash = hex::encode(chunk.last().unwrap().hash);
-                    let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+            hashes.par_chunks(chunk_size).for_each(|chunk| {
+                let first_hash = hex::encode(chunk.first().unwrap().hash);
+                let last_hash = hex::encode(chunk.last().unwrap().hash);
+                let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
 
-                    let offset = (i * chunk_size) as u64 * 32;
-                    store_hashes::store_hashes_chunk(chunk, &chunk_filename, offset)
-                        .expect("Failed to store hashes");
+                store_hashes::store_hashes_chunk(chunk, &chunk_filename)
+                    .expect("Failed to store hashes");
 
-                    // Write to index file
-                    let mut index_file = index_file.lock().unwrap();
-                    let line_to_write =
-                        format!("{} {} {}\n", &chunk_filename, &first_hash, &last_hash);
-                    index_file
-                        .write_all(line_to_write.as_bytes())
-                        .expect("Failed to write to index file");
-                });
+                // Write to index file
+                let mut index_file = index_file.lock().unwrap();
+                let line_to_write = format!("{} {} {}\n", &chunk_filename, &first_hash, &last_hash);
+                index_file
+                    .write_all(line_to_write.as_bytes())
+                    .expect("Failed to write to index file");
+            });
 
             // let _ = print_records::print_index_file(index_file_path);
 

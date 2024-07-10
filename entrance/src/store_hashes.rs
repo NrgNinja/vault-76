@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{self, Seek, SeekFrom, Write};
+use std::io::{self, Write};
 
 use crate::Record;
 
@@ -10,7 +10,7 @@ use crate::Record;
 //     Ok(())
 // }
 
-pub fn store_hashes_chunk(chunk: &[Record], filename: &str, offset: u64) -> io::Result<()> {
+pub fn store_hashes_chunk(chunk: &[Record], filename: &str) -> io::Result<()> {
     let path = format!("output/{}", filename);
     let mut file = OpenOptions::new().write(true).create(true).open(path)?;
 
@@ -24,7 +24,6 @@ pub fn store_hashes_chunk(chunk: &[Record], filename: &str, offset: u64) -> io::
     }
 
     // Seek to the start position and write the entire buffer
-    file.seek(SeekFrom::Start(offset))?;
     file.write_all(&buffer)?;
 
     Ok(())

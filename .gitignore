@@ -6,3 +6,4 @@ output.bin
 entrance/output/*
 entrance/stats/*
 .ipynb_checkpoints/
+output.zip
