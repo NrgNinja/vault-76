@@ -6,19 +6,22 @@ cd ../..
 
 # Specify the output directory
 output_dir="output"
-
-free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
-sleep 3
-
 # Clean the output directory
 echo "Cleaning the output directory..."
 rm -rf "${output_dir:?}"/*
 
-sar -u 1 > stats/cpu/cpu-stats_$k$threads.txt &
-sar -b 1 > stats/io/io-stats_$k$threads.txt &
-sar -r 1 > stats/memory/memory-stats_$k$threads.txt &
+free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
 
-./target/release/entrance -k $k -t $threads -p 10
+sar -u 1 >stats/cpu/cpu-stats_$k$threads.txt &
+sar -b 1 >stats/io/io-stats_$k$threads.txt &
+sar -r 1 >stats/memory/memory-stats_$k$threads.txt &
+sleep 5
+
+./target/release/entrance -k $k -t $threads
+# dd if=/dev/urandom of=newfile bs=1M count=1024
+# shred -s 1000000000 - >my-file
+sleep 5
+
 pkill sar
 
 file_size=$(du -hs $output_dir)

@@ -14,23 +14,25 @@ total_time=0
 num_runs=10
 
 for n in {1..10}; do
-    free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
-    sleep 3
-
     # Clean the output directory
     echo "Cleaning the output directory..."
     rm -rf "${output_dir:?}"/*
 
+    free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
+    sleep 5
+
     # Start the sar command to monitor CPU and IO stats
-    sar -u 1 > stats/cpu/cpu-stats_$n.txt &
-    sar -b 1 > stats/io/io-stats_$n.txt &
-    sar -r 1 > stats/memory/memory-stats_$n.txt &
+    sar -u 1 >stats/cpu/cpu-stats_$n.txt &
+    sar -b 1 >stats/io/io-stats_$n.txt &
+    sar -r 1 >stats/memory/memory-stats_$n.txt &
 
     echo ----------------------------------------Run $n---------------------------------------------
 
     # Capture the output of the program
     output=$(./target/release/entrance -k $k -t $threads)
 
+    sleep 5
+    
     # Stop the sar command
     pkill sar
     echo "$output"

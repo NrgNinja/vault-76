@@ -5,4 +5,4 @@ Cargo.lock
 output.bin
 entrance/output/*
 entrance/stats/*
-
+.ipynb_checkpoints/
