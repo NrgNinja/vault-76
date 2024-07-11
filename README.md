@@ -110,6 +110,9 @@ The script first cleans cache, then runs release build with specified parameters
 ### Mutex
 [Allows multiple threads to access a shared resource while ensuring that only one thread can access it at a time.](https://doc.rust-lang.org/std/sync/struct.Mutex.html)
 
+### Postcard
+[Postcard is a #![no_std] focused serializer and deserializer for Serde..](https://docs.rs/postcard/latest/postcard/)
+
 ## Known Bugs
 * The generation of hashes and storing them into a dashmap is a consistent ~2-3 seconds depending on your system and thread count. There doesn't seem to be a way to make this faster at the moment.
 * Writing to disk using a sparse file from a DashMap is a consistent ~1 second, is there any way to make this under a second?
