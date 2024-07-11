@@ -5,9 +5,6 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 mod hash_generator;
@@ -152,41 +149,75 @@ fn main() {
             let start_store_output_timer: Instant = Instant::now();
             let index_file_path = "output/file_index.bin";
 
-            // let mut index_data = Mutex::new(Vec::new());
+            // hashes.par_chunks(chunk_size).for_each(|chunk| {
+            //     let first_hash = hex::encode(chunk.first().unwrap().hash);
+            //     let last_hash = hex::encode(chunk.last().unwrap().hash);
+            //     let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
 
-            // Open index file once outside of the parallel loop
+            //     store_hashes::store_hashes_chunk(chunk, &chunk_filename)
+            //         .expect("Failed to store hashes");
+
+            //     // Write to index file
+            //     // let mut index_file = index_file.lock().unwrap();
+            //     // let line_to_write = format!("{} {} {}\n", &chunk_filename, &first_hash, &last_hash);
+            //     // index_file
+            //     //     .write_all(line_to_write.as_bytes())
+            //     //     .expect("Failed to write to index file");
+            //     let start_store_index_data = Instant::now();
+            //     // index_data
+            //     //     .lock()
+            //     //     .unwrap()
+            //     //     .push(format!("{} {} {}\n", chunk_filename, first_hash, last_hash));
+
+            //     writer
+            //         .lock()
+            //         .unwrap()
+            //         .write_all(
+            //             format!("{} {} {}\n", chunk_filename, first_hash, last_hash).as_bytes(),
+            //         )
+            //         .expect("Failed to write to index file");
+            //     let store_index_data_duration = start_store_index_data.elapsed();
+            //     println!("Storing index data took {:?}", store_index_data_duration);
+            // });
+
+            let results = hashes
+                .par_chunks(chunk_size)
+                .map(|chunk| {
+                    let first_hash = hex::encode(chunk.first().unwrap().hash);
+                    let last_hash = hex::encode(chunk.last().unwrap().hash);
+                    let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+
+                    store_hashes::store_hashes_chunk(chunk, &chunk_filename)
+                        .expect("Failed to store hashes");
+
+                    // Write to index file using the buffered writer
+                    // let start_store_index_data = Instant::now();
+                    // {
+                    //     let mut writer = buffered_writer.lock().unwrap();
+                    //     writer
+                    //         .write_all(
+                    //             format!("{} {} {}\n", chunk_filename, first_hash, last_hash)
+                    //                 .as_bytes(),
+                    //         )
+                    //         .expect("Failed to write to index file");
+                    // }
+                    // let store_index_data_duration = start_store_index_data.elapsed();
+                    // println!("Storing index data took {:?}", store_index_data_duration);
+
+                    (first_hash, last_hash, chunk_filename)
+                })
+                .collect();
+
             let start_create_index_file = Instant::now();
-            let index_file = Mutex::new(
-                OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .append(true)
-                    .open(index_file_path)
-                    .expect("Failed to open index file"),
-            );
-            // let index_file: Arc<Mutex<File>> = Arc::new(Mutex::new(
-            //     File::create(index_file_path).expect("Failed to create index file"),
-            // ));
+
+            store_hashes::create_index_file(index_file_path, results)
+                .expect("Failed to create index file");
+
             let create_index_file_duration = start_create_index_file.elapsed();
             println!("Creating index file took {:?}", create_index_file_duration);
 
-            hashes.par_chunks(chunk_size).for_each(|chunk| {
-                let first_hash = hex::encode(chunk.first().unwrap().hash);
-                let last_hash = hex::encode(chunk.last().unwrap().hash);
-                let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
-
-                store_hashes::store_hashes_chunk(chunk, &chunk_filename)
-                    .expect("Failed to store hashes");
-
-                // Write to index file
-                let mut index_file = index_file.lock().unwrap();
-                let line_to_write = format!("{} {} {}\n", &chunk_filename, &first_hash, &last_hash);
-                index_file
-                    .write_all(line_to_write.as_bytes())
-                    .expect("Failed to write to index file");
-                // index_data.lock().unwrap().push(format!("{} {} {}\n", chunk_filename, first_hash, last_hash));
-                // index_data.push(format!("{} {} {}\n", chunk_filename, first_hash, last_hash));
-            });
+            // let start_store_index_file = Instant::now();
+            // writer.flush().expect("Failed to flush index file");
 
             // let mut index_file = OpenOptions::new()
             //     .write(true)
@@ -200,11 +231,13 @@ fn main() {
             //         .write_all(line_to_write.as_bytes())
             //         .expect("Failed to write to index file");
             // }
-
-            let _ = print_records::print_index_file(index_file_path);
+            // let store_index_file_duration = start_store_index_file.elapsed();
+            // println!("Storing index file took {:?}", store_index_file_duration);
 
             let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
             println!("Writing hashes to disk took {:?}", store_output_duration);
+
+            // let _ = print_records::print_index_file(index_file_path);
         }
 
         let duration = start_vault_timer.elapsed();

@@ -1,7 +1,7 @@
 use crate::Record;
-use bincode::deserialize_from;
+use postcard::from_bytes;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufReader, Read};
 
 pub fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
     let mut num: u64 = 0;
@@ -17,32 +17,6 @@ pub fn hash_to_string(hash: &[u8; 26]) -> String {
         .collect::<Vec<String>>()
         .join("")
 }
-
-// function to deserialize and print all of the records into command line from a single file
-// pub fn print_records(filename: &str, num_records_print: u64) -> io::Result<()> {
-//     let file = File::open(filename)?;
-//     let mut reader = BufReader::new(file);
-
-//     println!("Here are the first {num_records_print} records:");
-//     println!("{:<20} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
-//     println!("{}", "-".repeat(88)); // Creates a separator line
-
-//     let mut counter = 0;
-
-//     while counter < num_records_print {
-//         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
-//             Ok(record) => {
-//                 let nonce_decimal = nonce_to_decimal(&record.nonce);
-//                 let hash_hex = hash_to_string(&record.hash);
-//                 println!("{:<20} | {}", nonce_decimal, hash_hex);
-//                 counter += 1;
-//             }
-//             Err(_) => break,
-//         }
-//     }
-
-//     Ok(())
-// }
 
 // Print records from all the files stored in the directory
 pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> {
@@ -71,16 +45,18 @@ pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> 
         let file = File::open(file_path)?;
         let mut reader = BufReader::new(file);
 
-        while counter < num_records_print {
-            match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
-                Ok(record) => {
-                    let nonce_decimal = nonce_to_decimal(&record.nonce);
-                    let hash_hex = hash_to_string(&record.hash);
-                    println!("{:<20} | {}", nonce_decimal, hash_hex);
-                    counter += 1;
-                }
-                Err(_) => break,
-            }
+        let mut buffer = Vec::new();
+        reader.read_to_end(&mut buffer)?;
+
+        let mut deserialized_records: Vec<Record> =
+            from_bytes(&buffer).expect("Failed to deserialize records");
+
+        while counter < num_records_print && !deserialized_records.is_empty() {
+            let record = deserialized_records.remove(0);
+            let nonce_decimal = nonce_to_decimal(&record.nonce);
+            let hash_hex = hash_to_string(&record.hash);
+            println!("{:<20} | {}", nonce_decimal, hash_hex);
+            counter += 1;
         }
 
         if counter >= num_records_print {
@@ -92,17 +68,17 @@ pub fn print_records(directory: &str, num_records_print: u64) -> io::Result<()> 
 }
 
 // Prints contents of file_index that contains metadata about each file
-pub fn print_index_file(index_file_path: &str) -> io::Result<()> {
-    let file = File::open(index_file_path)?;
-    let reader = io::BufReader::new(file);
+// pub fn print_index_file(index_file_path: &str) -> io::Result<()> {
+//     let file = File::open(index_file_path)?;
+//     let reader = io::BufReader::new(file);
 
-    println!("Contents of file_index.bin:");
+//     println!("Contents of file_index.bin:");
 
-    for line in reader.lines() {
-        println!("{}", line?);
-    }
+//     for line in reader.lines() {
+//         println!("{}", line?);
+//     }
 
-    println!("Done printing file_index.bin");
+//     println!("Done printing file_index.bin");
 
-    Ok(())
-}
+//     Ok(())
+// }

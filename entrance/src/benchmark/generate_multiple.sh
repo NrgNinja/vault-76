@@ -22,9 +22,9 @@ for n in {1..10}; do
     sleep 5
 
     # Start the sar command to monitor CPU and IO stats
-    sar -u 1 >stats/cpu/cpu-stats_$n.txt &
-    sar -b 1 >stats/io/io-stats_$n.txt &
-    sar -r 1 >stats/memory/memory-stats_$n.txt &
+    # sar -u 1 >stats/cpu/cpu-stats_$n.txt &
+    # sar -b 1 >stats/io/io-stats_$n.txt &
+    # sar -r 1 >stats/memory/memory-stats_$n.txt &
 
     echo ----------------------------------------Run $n---------------------------------------------
 
@@ -34,7 +34,7 @@ for n in {1..10}; do
     sleep 5
     
     # Stop the sar command
-    pkill sar
+    # pkill sar
     echo "$output"
 
     # Extract the generating hashes time from the output and add it to the total time for 3 runs
