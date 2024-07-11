@@ -1,6 +1,8 @@
-// this file prints records in the DashMap to the command line when specified by the p flag
+// this file prints records specified by the command line flag: -p
 use crate::Record;
-use dashmap::DashMap;
+use bincode::deserialize_from;
+use std::fs::File;
+use std::io::{self, BufReader};
 
 // converts nonce from byte array to a decimal value
 fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
@@ -15,35 +17,27 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
         .join("")
 }
 
-// function to deserialize and print a specified number of records from a DashMap
-pub fn print_records_dashmap(map: &DashMap<u64, Vec<Record>>, num_records_to_print: usize) {
-    println!("Here are the first {} records:", num_records_to_print);
-    println!(
-        "{:<16} | {:<10} | {:<64}",
-        "Nonce (Decimal)", "Prefix (Hex)", "Hash (Hex)"
-    );
-    println!("{}", "-".repeat(100)); // Separator line
+// this function reads the records from the output file, deserializes them and then prints them
+pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
+    let path = "output/output.bin";
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
 
-    let mut printed = 0;
+    println!("{:<16} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
+    println!("{}", "-".repeat(88)); // creates a separator line
 
-    let mut keys_with_records: Vec<(u64, Vec<Record>)> = map
-        .iter()
-        .map(|entry| (*entry.key(), entry.value().clone()))
-        .collect();
+    let mut counter = 0;
 
-    // sort by keys to ensure records are printed in the order of their prefixes
-    keys_with_records.sort_by_key(|k| k.0);
-
-    'outer: for (prefix, records) in keys_with_records {
-        for record in records {
-            if printed >= num_records_to_print {
-                break 'outer;
+    while counter < num_records_print {
+        match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
+            Ok(record) => {
+                let nonce_decimal = nonce_to_decimal(&record.nonce);
+                let hash_hex = hash_to_string(&record.hash);
+                println!("{:<16} | {}", nonce_decimal, hash_hex);
+                counter += 1;
             }
-            let nonce_decimal = nonce_to_decimal(&record.nonce);
-            let hash_hex = hash_to_string(&record.hash);
-            let prefix_hex = format!("{:04x}", prefix);
-            println!("{:<16} | {:<12} | {}", nonce_decimal, prefix_hex, hash_hex);
-            printed += 1;
+            Err(_) => break,
         }
     }
+    Ok(())
 }

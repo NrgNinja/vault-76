@@ -1,66 +1,98 @@
 // this file writes the hashes to disk using multiple threads
 use crate::Record;
 use dashmap::DashMap;
-// use rayon::prelude::*;
-use std::collections::HashMap;
+use heapless::Vec as HeaplessVec;
+use postcard::to_vec;
+// use postcard::to_io;
+use rayon::prelude::*;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
-use std::sync::Arc;
+// use std::time::Instant;
 
-pub fn create_sparse_file(filename: &str, size: u64) -> io::Result<()> {
-    let file = OpenOptions::new().write(true).create(true).open(filename)?;
-    file.set_len(size)?;
+const BUFFER_SIZE: usize = 128 * 1024; // 128 KB
+
+// multi-threaded approach where threads write to different parts of the file
+pub fn store_hashes_optimized(map: &DashMap<u64, Vec<Record>>, filename: &str) -> io::Result<()> {
+    let path = PathBuf::from("output").join(filename);
+    let file_size = calculate_total_size(&map);
+
+    // create a sparse file of a determined size
+    let file = OpenOptions::new().write(true).create(true).open(&path)?;
+    file.set_len(file_size)?;
+
+    let keys_and_offsets = prepare_offsets(&map); // returns Vec<(u64, usize, usize)> where each tuple is (key, offset, length)
+
+    // parallel write to different sections of the file
+    keys_and_offsets
+        .into_par_iter()
+        .try_for_each(|(key, offset, length)| {
+            let records = map.get(&key).unwrap();
+            let mut local_file = OpenOptions::new().write(true).open(&path)?;
+            local_file.seek(SeekFrom::Start(offset as u64))?;
+            let mut local_writer = BufWriter::with_capacity(BUFFER_SIZE, local_file);
+
+            let mut total_written = 0; // amount of data written; debugging purposes
+
+            // write serialized records to a heapless vector and then to the file
+            for record in records.value() {
+                let encoded: HeaplessVec<u8, 32> =
+                    to_vec(record).expect("Failed to serialize hash");
+                if total_written + encoded.len() <= length {
+                    local_writer.write_all(&encoded)?;
+                    total_written += encoded.len();
+                }
+            }
+
+            if total_written != length {
+                return Err(io::Error::new(io::ErrorKind::Other, "Data length mismatch"));
+            }
+
+            local_writer.flush()?;
+            Ok::<(), io::Error>(())
+        })?;
+
+    // let file = OpenOptions::new().write(true).open(&path)?;
+
+    // keys_and_offsets
+    //     .into_par_iter()
+    //     .try_for_each(|(key, offset, _length)| {
+    //         let records = map.get(&key).unwrap();
+    //         let mut local_writer = BufWriter::with_capacity(BUFFER_SIZE, &file);
+    //         local_writer.seek(SeekFrom::Start(offset as u64))?;
+
+    //         for record in records.value() {
+    //             to_io(record, &mut local_writer)
+    //                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    //         }
+    //         local_writer.flush()?;
+    //         Ok::<(), io::Error>(())
+    //     })?;
+
     Ok(())
 }
 
-// varvara's method of using a sparse file of a fixed size to store hashes (saves space)
-pub fn store_hashes_dashmap(map: &DashMap<u64, Vec<Record>>, filename: &str) -> io::Result<()> {
-    let mut path = PathBuf::from("output");
-    path.push(filename);
+// function to calculate the total size of the file by counting each record in the DashMap
+pub fn calculate_total_size(map: &DashMap<u64, Vec<Record>>) -> u64 {
+    map.iter()
+        .map(|entry| entry.value().len() as u64 * 32)
+        .sum()
+}
 
-    // collect and sort keys
+// function to prepare the offsets for each key in the DashMap
+pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> Vec<(u64, usize, usize)> {
     let mut keys: Vec<u64> = map.iter().map(|entry| *entry.key()).collect();
-    keys.sort_unstable();
+    keys.par_sort_unstable(); // sort keys in parallel
 
-    // calculate cumulative offsets based on sorted keys
-    let mut cumulative_offset = 0u64;
-    let mut key_offsets = HashMap::new();
-    for key in &keys {
-        let data_size = map.get(key).map_or(0, |v| v.len() as u64 * 32); // each record is assumed to be 32 bytes
-        key_offsets.insert(*key, cumulative_offset);
-        cumulative_offset += data_size;
-    }
+    let mut offsets = Vec::new();
+    let mut cumulative_offset = 0;
 
-    create_sparse_file(&path.to_string_lossy(), cumulative_offset)?;
-
-    // use arc to share file across threads
-    let file = Arc::new(OpenOptions::new().write(true).open(path)?);
-
-    // write to file using sorted keys
     for key in keys {
-        if let Some(records_ref) = map.get(&key) {
-            let records = records_ref.value(); // Dereference to get the Vec<Record>
-            let local_file = file.clone();
-            let offset = key_offsets[&key];
-
-            let mut local_writer = BufWriter::new(&*local_file);
-            local_writer.seek(SeekFrom::Start(offset)).unwrap();
-
-            // uncomment following to print records being written to file (debugging purposes)
-            // println!(
-            //     "Writing to offset {} for prefix {:04x} with {} records",
-            //     offset,
-            //     key,
-            //     records.len()
-            // );
-
-            for record in records {
-                let encoded = bincode::serialize(record).expect("Failed to serialize hash");
-                local_writer.write_all(&encoded).unwrap();
-            }
-            local_writer.flush().unwrap();
+        if let Some(records) = map.get(&key) {
+            let size = records.len() * 32; // each record is 32 bytes
+            offsets.push((key, cumulative_offset, size));
+            cumulative_offset += size;
         }
     }
-    Ok(())
+    offsets
 }

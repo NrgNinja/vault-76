@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Path to the output directory
-output_dir="../output"
+output_dir="output"
 
 # Parameters from command line
 k="$1"
@@ -12,22 +12,23 @@ cd ..
 generating_time=0
 writing_time=0
 total_time=0
-num_runs=3  # Number of runs for averaging
+num_runs=6  # Number of runs for averaging
 
-for n in {1..3}; do
+for n in {1..6}; do
     # Clear output directory and system caches
     echo "Cleaning the output directory..."
     rm -rf "${output_dir:?}"/*
     free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
     sleep 3
 
-    sar -u 1 > output/cpu-stats_$n.txt &
-    sar -b 1 > output/io-stats_$n.txt &
+    sar -u 1 > stats/cpu-stats_$n.txt &
+    sar -b 1 > stats/io-stats_$n.txt &
+    sar -r 1 > stats/mem-stats_$n.txt &
 
     echo "----------------------------------------Run $n---------------------------------------------"
 
     # Run the program and capture the output
-    output=$(./target/release/entrance -k $k -t $threads -f "${output_dir}/output.bin")
+    output=$(./target/release/entrance -k $k -t $threads -f output.bin)
 
     # Kill the sar process
     pkill sar

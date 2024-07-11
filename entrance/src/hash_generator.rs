@@ -3,7 +3,6 @@ use crate::Record;
 use blake3::Hasher;
 use std::convert::TryInto;
 
-// const NONCE_SIZE: usize = 6;
 const HASH_SIZE: usize = 26;
 
 // this method uses prefix extraction & returns the hash with its prefix for storage in DashMap

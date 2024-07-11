@@ -3,4 +3,5 @@ entrance/target/debug/
 entrance/target/
 Cargo.lock
 entrance/output/
+entrance/stats/
 .DS_Store

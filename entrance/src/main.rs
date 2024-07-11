@@ -65,7 +65,7 @@ fn main() {
                 .short('x')
                 .long("prefix-length")
                 .takes_value(true)
-                .default_value("2") // Set a default value or make it required
+                .default_value("2") // set a default value or make it required
                 .help("Specify the prefix length in bytes to categorize the hashes"),
         )
         .arg(
@@ -79,7 +79,6 @@ fn main() {
 
     // determine if lookup is specified, otherwise continue normal vault operations
     if let Some(lookup_value) = matches.value_of("lookup") {
-        // Lookup functionality
         if let Err(e) =
             lookup::lookup_by_prefix(matches.value_of("filename").unwrap_or(""), lookup_value)
         {
@@ -118,47 +117,6 @@ fn main() {
 
     let output_file = matches.value_of("filename").unwrap_or("");
 
-    // --------------------------------------------------------------------------------------------
-    // use blake3::{Hasher, Hash};
-
-    // let num_hashes_only = 33554432; // Replace with the number of hashes you want to generate
-    // let start_only = Instant::now();
-
-    // (0..num_hashes_only).into_par_iter().for_each(|_| {
-    //     let mut hasher_only = Hasher::new();
-    //     hasher_only.update(b"example data");
-    //     let _hash_only = hasher_only.finalize();
-    // });
-
-    // let duration_only = start_only.elapsed();
-    // println!(
-    //     "Time taken to generate {} hashes only: {:?}",
-    //     num_hashes_only, duration_only
-    // );
-
-    // GENERATE HASHES ONLY ^----------------------------------------------------------------------
-
-    // --------------------------------------------------------------------------------------------
-
-    // let start_and = Instant::now();
-
-    // let _hashes_and: Vec<Hash> = (0..num_hashes_only)
-    //     .into_par_iter()
-    //     .map(|_| {
-    //         let mut hasher_and = Hasher::new();
-    //         hasher_and.update(b"example data");
-    //         hasher_and.finalize()
-    //     })
-    //     .collect();
-
-    // let duration_and = start_and.elapsed();
-    // println!(
-    //     "Time taken to generate and store {} hashes into a vector: {:?}",
-    //     num_hashes_only, duration_and
-    // );
-
-    // GENERATE AND STORE HASHES INTO VECTOR ^-----------------------------------------------------
-
     let generation_start = Instant::now();
 
     // generate hashes in parallel and store them into a DashMap data structure
@@ -179,7 +137,7 @@ fn main() {
 
     // if an output file is specified by the command line, it will write to that file
     if !output_file.is_empty() {
-        let _ = store_hashes::store_hashes_dashmap(&map, output_file);
+        let _ = store_hashes::store_hashes_optimized(&map, output_file);
     }
 
     let storage_duration = storage_start.elapsed();
@@ -191,7 +149,7 @@ fn main() {
     let num_keys = map.len();
     let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
 
-    // if you want to see details of each bucket, uncomment the following lines
+    // if you want to see details of each prefix bucket, uncomment the following lines
     // let mut keys_with_counts: Vec<(u64, usize)> = map
     //     .iter()
     //     .map(|entry| (*entry.key(), entry.value().len()))
@@ -214,6 +172,6 @@ fn main() {
         .value_of("print")
         .map(|v| v.parse::<usize>().unwrap())
     {
-        print_records::print_records_dashmap(&map, num_records_to_print);
+        print_records::print_records_from_file(num_records_to_print as u64).unwrap();
     }
 }
