@@ -32,6 +32,7 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
         let truncated_end_hash = &entry.end_hash[..target_hash_len];
 
         if target_hash_arr >= truncated_start_hash && truncated_end_hash >= target_hash_arr {
+            // add print statement to check if None does it still go inside of here
             // let start_looking_inside = Instant::now();
             let file_path = format!("{}/{}", directory, entry.filename);
             // println!("Opening file: {}", files_path);

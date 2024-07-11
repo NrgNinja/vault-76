@@ -5,7 +5,7 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
-use std::time::Instant;
+use std::{fs::OpenOptions, time::Instant};
 
 mod hash_generator;
 mod hash_sorter;
@@ -83,7 +83,7 @@ fn main() {
 
     let num_threads = matches
         .value_of("threads")
-        .unwrap_or("16")
+        .unwrap_or("1")
         .parse::<usize>()
         .expect("Please provide a valid number for threads");
 
@@ -107,7 +107,7 @@ fn main() {
 
     let target_hash = matches.value_of("target_hash").unwrap_or("0");
 
-    let directory = "./output";
+    let directory = "output";
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -149,64 +149,85 @@ fn main() {
             let start_store_output_timer: Instant = Instant::now();
             let index_file_path = "output/file_index.bin";
 
-            // hashes.par_chunks(chunk_size).for_each(|chunk| {
-            //     let first_hash = hex::encode(chunk.first().unwrap().hash);
-            //     let last_hash = hex::encode(chunk.last().unwrap().hash);
-            //     let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+            let mut file_handles = vec![];
+            let mut results = vec![];
 
-            //     store_hashes::store_hashes_chunk(chunk, &chunk_filename)
-            //         .expect("Failed to store hashes");
+            let dummy_path = "output/dummy_file.bin";
+            let dummy_file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(dummy_path)
+                .expect("Failed to create dummy file");
+            drop(dummy_file);
 
-            //     // Write to index file
-            //     // let mut index_file = index_file.lock().unwrap();
-            //     // let line_to_write = format!("{} {} {}\n", &chunk_filename, &first_hash, &last_hash);
-            //     // index_file
-            //     //     .write_all(line_to_write.as_bytes())
-            //     //     .expect("Failed to write to index file");
-            //     let start_store_index_data = Instant::now();
-            //     // index_data
-            //     //     .lock()
-            //     //     .unwrap()
-            //     //     .push(format!("{} {} {}\n", chunk_filename, first_hash, last_hash));
+            // Create files sequentially
+            for chunk in hashes.chunks(chunk_size) {
+                let start_create_file = Instant::now();
+                let first_hash = hex::encode(chunk.first().unwrap().hash);
+                let last_hash = hex::encode(chunk.last().unwrap().hash);
+                let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
 
-            //     writer
-            //         .lock()
-            //         .unwrap()
-            //         .write_all(
-            //             format!("{} {} {}\n", chunk_filename, first_hash, last_hash).as_bytes(),
-            //         )
-            //         .expect("Failed to write to index file");
-            //     let store_index_data_duration = start_store_index_data.elapsed();
-            //     println!("Storing index data took {:?}", store_index_data_duration);
-            // });
+                let path = format!("output/{}", chunk_filename);
+                let file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .open(&path)
+                    .expect("Failed to create file");
 
-            let results = hashes
-                .par_chunks(chunk_size)
-                .map(|chunk| {
-                    let first_hash = hex::encode(chunk.first().unwrap().hash);
-                    let last_hash = hex::encode(chunk.last().unwrap().hash);
-                    let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+                // Pre-allocate file size based on expected chunk size (example size, adjust as needed)
+                let expected_size = chunk_size * RECORD_SIZE;
+                file.set_len(expected_size as u64)
+                    .expect("Failed to pre-allocate file size");
 
-                    store_hashes::store_hashes_chunk(chunk, &chunk_filename)
-                        .expect("Failed to store hashes");
+                file_handles.push((file, chunk_filename.clone()));
+                results.push((first_hash, last_hash, chunk_filename));
+                let create_file_duration = start_create_file.elapsed();
+                println!("Creating a file took {:?}", create_file_duration);
+            }
 
-                    // Write to index file using the buffered writer
-                    // let start_store_index_data = Instant::now();
-                    // {
-                    //     let mut writer = buffered_writer.lock().unwrap();
-                    //     writer
-                    //         .write_all(
-                    //             format!("{} {} {}\n", chunk_filename, first_hash, last_hash)
-                    //                 .as_bytes(),
-                    //         )
-                    //         .expect("Failed to write to index file");
-                    // }
-                    // let store_index_data_duration = start_store_index_data.elapsed();
-                    // println!("Storing index data took {:?}", store_index_data_duration);
+            let create_files_duration = start_store_output_timer.elapsed();
+            println!(
+                "Creating files sequentially took {:?}",
+                create_files_duration
+            );
+            let start_parallel_iterator = Instant::now();
+            file_handles
+                .par_iter_mut()
+                .zip(hashes.par_chunks(chunk_size))
+                .for_each(|((file, chunk_filename), chunk)| {
+                    let start_store_output_chunk = Instant::now();
+                    store_hashes::store_hashes_chunk(chunk, file).expect("Failed to store hashes");
 
-                    (first_hash, last_hash, chunk_filename)
-                })
-                .collect();
+                    let store_output_chunk_duration = start_store_output_chunk.elapsed();
+                    println!(
+                        "Storing chunk {} took {:?}",
+                        chunk_filename, store_output_chunk_duration
+                    );
+                });
+
+            // let results = hashes
+            //     .par_chunks(chunk_size)
+            //     .map(|chunk| {
+            //         let first_hash = hex::encode(chunk.first().unwrap().hash);
+            //         let last_hash = hex::encode(chunk.last().unwrap().hash);
+            //         let chunk_filename = format!("{}-{}.bin", first_hash, last_hash);
+
+            //         let start_store_output_chunk = Instant::now();
+            //         store_hashes::store_hashes_chunk(chunk, &chunk_filename)
+            //             .expect("Failed to store hashes");
+
+            //         let store_output_chunk_duration = start_store_output_chunk.elapsed();
+            //         println!(
+            //             "Storing chunk {} took {:?}",
+            //             chunk_filename, store_output_chunk_duration
+            //         );
+
+            //         (first_hash, last_hash, chunk_filename)
+            //     })
+            //     .collect();
+            let parallel_iterator_duration: std::time::Duration = start_parallel_iterator.elapsed();
+            println!("Parallel iterator takes {:?}", parallel_iterator_duration);
 
             let start_create_index_file = Instant::now();
 
@@ -215,24 +236,6 @@ fn main() {
 
             let create_index_file_duration = start_create_index_file.elapsed();
             println!("Creating index file took {:?}", create_index_file_duration);
-
-            // let start_store_index_file = Instant::now();
-            // writer.flush().expect("Failed to flush index file");
-
-            // let mut index_file = OpenOptions::new()
-            //     .write(true)
-            //     .create(true)
-            //     .truncate(true) // Ensure file is truncated if it exists
-            //     .open(index_file_path)
-            //     .expect("Failed to open index file");
-
-            // for line_to_write in index_data.lock().unwrap().iter() {
-            //     index_file
-            //         .write_all(line_to_write.as_bytes())
-            //         .expect("Failed to write to index file");
-            // }
-            // let store_index_file_duration = start_store_index_file.elapsed();
-            // println!("Storing index file took {:?}", store_index_file_duration);
 
             let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
             println!("Writing hashes to disk took {:?}", store_output_duration);
