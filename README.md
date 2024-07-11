@@ -121,6 +121,7 @@ The script first cleans cache, then runs release build with specified parameters
 * keep README up to date 
 * implement caching layer with NVMe + HDD solutions
 * explore lossy/lossless compression techniques
+* be awesome
 
 ## About the Authors:
 * [Varvara Bondarenko](varvara.bondarenko14@gmail.com) 
