@@ -24,10 +24,6 @@ struct Record {
 }
 
 fn main() {
-    // Initialization before any operations
-    // Initialize logging or any other required resources here
-    println!("Starting the vault process...");
-
     // Perform a dummy file operation to prime the file system
     let dummy_path = "output/dummy_file.bin";
     let _dummy_file = OpenOptions::new()
@@ -137,6 +133,7 @@ fn main() {
     let start_vault_timer: Instant = Instant::now();
 
     if k != 0 {
+        println!("Populating the vault...");
         let start_hash_gen_timer: Instant = Instant::now();
 
         let mut hashes: Vec<Record> = (0..num_records)
@@ -182,6 +179,9 @@ fn main() {
                 })
                 .collect();
 
+            let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+            println!("Parallel iterator took {:?}", store_output_duration);
+
             store_hashes::create_index_file(index_file_path, results)
                 .expect("Failed to create index file");
 
@@ -217,17 +217,15 @@ fn main() {
 
         // Single-threaded
         match lookup::lookup_hash_in_file(directory, &target_hash) {
-            Ok(results) => println!("Found records: {:?}", results),
-            // Ok(None) => println!("Hash not found"),
+            Ok(Some(record)) => {
+                let hash = print_records::hash_to_string(&record.hash);
+                let nonce = print_records::nonce_to_decimal(&record.nonce);
+
+                println!("FOUND RECORD - Nonce: {}, Hash: {}", nonce, hash);
+            }
+            Ok(None) => println!("RECORD NOT FOUND"),
             Err(e) => eprintln!("Error occurred: {}", e),
         }
-
-        // Multi-threaded
-        // match lookup::lookup_hash(directory, target_hash) {
-        //     Ok(Some(record)) => println!("Found record: {:?}", record),
-        //     Ok(None) => println!("Record not found"),
-        //     Err(e) => eprintln!("Error occurred: {}", e),
-        // }
 
         let lookup_duration = start_lookup_timer.elapsed();
         println!("Looking up {} hash took {:?}", target_hash, lookup_duration);

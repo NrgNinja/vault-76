@@ -2,11 +2,11 @@ use crate::{Record, HASH_SIZE, NONCE_SIZE};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
 
-fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
+pub fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
     nonce.iter().fold(0, |acc, &byte| (acc << 8) | byte as u64)
 }
 
-fn hash_to_string(hash: &[u8; 26]) -> String {
+pub fn hash_to_string(hash: &[u8; 26]) -> String {
     hash.iter()
         .map(|byte| format!("{:02x}", byte))
         .collect::<Vec<_>>()
