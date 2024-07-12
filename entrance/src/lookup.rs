@@ -2,10 +2,14 @@
 use crate::Record;
 use bincode;
 use std::fs::File;
-use std::io::{self, BufReader, Seek, SeekFrom};
+use std::io::{self, BufRead, BufReader, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::time::Instant;
 
+// change this to match the default prefix length
+const PREFIX_LENGTH: usize = 2;
+
+// this function reads the records from the output file, deserializes them and then prints them
 pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
     let path = PathBuf::from("output").join(filename);
     let file = File::open(path)?;
@@ -14,20 +18,30 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
 
     let start_time = Instant::now();
 
-    // assuming an index or efficient way to find the offset for this prefix
-    let offset = find_offset_for_prefix(&mut reader, prefix)?;
+    // TODO: we can later change this number, 4, to match the prefix length
+    let (offset, size) = find_offset_for_prefix(&prefix[..(PREFIX_LENGTH * 2)])?;
     reader.seek(SeekFrom::Start(offset))?;
 
-    // for easier human readability
     println!("{:<16} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
     println!("{}", "-".repeat(88));
 
-    while let Some(record) = deserialize_next_record(&mut reader)? {
-        if record_matches_prefix(&record, prefix) {
-            count += 1;
-            let nonce_decimal = nonce_to_decimal(&record.nonce);
-            let hash_hex = hash_to_string(&record.hash);
-            println!("{:<16} | {}", nonce_decimal, hash_hex);
+    let end_offset = offset + size;
+    let mut current_offset = offset;
+
+    // iterate through the prefix bucket only; exit if we reach the end of the bucket
+    while current_offset < end_offset {
+        match deserialize_next_record(&mut reader) {
+            Ok(Some(record)) => {
+                if record_matches_prefix(&record, prefix) {
+                    count += 1;
+                    let nonce_decimal = nonce_to_decimal(&record.nonce);
+                    let hash_hex = hash_to_string(&record.hash);
+                    println!("{:<16} | {}", nonce_decimal, hash_hex);
+                }
+                current_offset += std::mem::size_of::<Record>() as u64;
+            }
+            Ok(None) => break,
+            Err(e) => return Err(e),
         }
     }
 
@@ -53,6 +67,7 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
         .join("")
 }
 
+// deserialize the next record from the reader
 fn deserialize_next_record<R: io::Read>(reader: &mut R) -> io::Result<Option<Record>> {
     let mut buffer = vec![0u8; std::mem::size_of::<Record>()];
     match reader.read_exact(&mut buffer) {
@@ -66,21 +81,40 @@ fn deserialize_next_record<R: io::Read>(reader: &mut R) -> io::Result<Option<Rec
     }
 }
 
+// check if the record matches the entire prefix specified
 fn record_matches_prefix(record: &Record, prefix: &str) -> bool {
     let hash_hex = hash_to_string(&record.hash);
     hash_hex.starts_with(prefix)
 }
 
-fn find_offset_for_prefix<R: io::Read + io::Seek>(reader: &mut R, prefix: &str) -> io::Result<u64> {
-    reader.seek(SeekFrom::Start(0))?; // Start from the beginning of the file
-    let mut offset = 0;
+// find the offset and size of the bucket for the given prefix
+fn find_offset_for_prefix(prefix: &str) -> io::Result<(u64, u64)> {
+    let metadata_path = PathBuf::from("output").join("metadata.bin");
+    let metadata_file = File::open(metadata_path)?;
+    let mut metadata_reader = BufReader::new(metadata_file);
 
-    while let Some(record) = deserialize_next_record(reader)? {
-        if record_matches_prefix(&record, prefix) {
-            return Ok(offset);
+    let prefix_num = u64::from_str_radix(prefix, 16)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+
+    let mut line = String::new();
+    while metadata_reader.read_line(&mut line)? > 0 {
+        let parts: Vec<&str> = line.trim().split(',').collect();
+        if let Ok(key) = parts[0].parse::<u64>() {
+            if key == prefix_num {
+                let offset = parts[1].parse::<u64>().map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Invalid offset in metadata")
+                })?;
+                let size = parts[2].parse::<u64>().map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Invalid size in metadata")
+                })?;
+                return Ok((offset, size));
+            }
         }
-        offset += std::mem::size_of::<Record>() as u64;
+        line.clear();
     }
 
-    Err(io::Error::new(io::ErrorKind::NotFound, "Prefix not found"))
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        "Prefix not found in metadata",
+    ))
 }

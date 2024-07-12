@@ -3,7 +3,6 @@ use crate::Record;
 use dashmap::DashMap;
 use heapless::Vec as HeaplessVec;
 use postcard::to_vec;
-// use postcard::to_io;
 use rayon::prelude::*;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
@@ -21,7 +20,7 @@ pub fn store_hashes_optimized(map: &DashMap<u64, Vec<Record>>, filename: &str) -
     let file = OpenOptions::new().write(true).create(true).open(&path)?;
     file.set_len(file_size)?;
 
-    let keys_and_offsets = prepare_offsets(&map); // returns Vec<(u64, usize, usize)> where each tuple is (key, offset, length)
+    let keys_and_offsets = prepare_offsets(&map)?; // returns Vec<(u64, usize, usize)> where each tuple is (key, offset, length)
 
     // parallel write to different sections of the file
     keys_and_offsets
@@ -51,24 +50,6 @@ pub fn store_hashes_optimized(map: &DashMap<u64, Vec<Record>>, filename: &str) -
             local_writer.flush()?;
             Ok::<(), io::Error>(())
         })?;
-
-    // let file = OpenOptions::new().write(true).open(&path)?;
-
-    // keys_and_offsets
-    //     .into_par_iter()
-    //     .try_for_each(|(key, offset, _length)| {
-    //         let records = map.get(&key).unwrap();
-    //         let mut local_writer = BufWriter::with_capacity(BUFFER_SIZE, &file);
-    //         local_writer.seek(SeekFrom::Start(offset as u64))?;
-
-    //         for record in records.value() {
-    //             to_io(record, &mut local_writer)
-    //                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
-    //         }
-    //         local_writer.flush()?;
-    //         Ok::<(), io::Error>(())
-    //     })?;
-
     Ok(())
 }
 
@@ -80,9 +61,13 @@ pub fn calculate_total_size(map: &DashMap<u64, Vec<Record>>) -> u64 {
 }
 
 // function to prepare the offsets for each key in the DashMap
-pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> Vec<(u64, usize, usize)> {
+pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> io::Result<Vec<(u64, usize, usize)>> {
     let mut keys: Vec<u64> = map.iter().map(|entry| *entry.key()).collect();
     keys.par_sort_unstable(); // sort keys in parallel
+
+    let path = PathBuf::from("output").join("metadata.bin");
+    let metadata_file = OpenOptions::new().write(true).create(true).open(path)?;
+    let mut metadata_writer = BufWriter::new(metadata_file);
 
     let mut offsets = Vec::new();
     let mut cumulative_offset = 0;
@@ -91,8 +76,14 @@ pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> Vec<(u64, usize, usiz
         if let Some(records) = map.get(&key) {
             let size = records.len() * 32; // each record is 32 bytes
             offsets.push((key, cumulative_offset, size));
+
+            // serialize and write the metadata for each key, logging the start of this section
+            let metadata = format!("{},{},{}\n", key, cumulative_offset, size);
+            metadata_writer.write_all(metadata.as_bytes())?;
+
             cumulative_offset += size;
         }
     }
-    offsets
+    metadata_writer.flush()?;
+    Ok(offsets)
 }
