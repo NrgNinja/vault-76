@@ -20,7 +20,6 @@ indicatif = "0.17.8"
 memmap2 = "0.9.4"
 postcard = { version = "1.0.8", features = ["use-std"]}
 heapless = "=0.7.17"
-filebuffer = "1.0.0"
 
 [profile.release]
 debug = false

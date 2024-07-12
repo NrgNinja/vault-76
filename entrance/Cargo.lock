@@ -191,7 +191,6 @@ dependencies = [
  "bincode",
  "blake3",
  "clap",
- "filebuffer",
  "heapless",
  "hex",
  "indicatif",
@@ -201,16 +200,6 @@ dependencies = [
  "rand",
  "rayon",
  "serde",
-]
-
-[[package]]
-name = "filebuffer"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c997bb4895e53c23e7ebdf8a315f0863206b19e51da2901cc24631eb0f26e209"
-dependencies = [
- "libc",
- "winapi",
 ]
 
 [[package]]
