@@ -2,7 +2,6 @@ use std::{
     cmp::Ordering,
     fs::File,
     io::{self, BufRead, BufReader},
-    time::Instant,
 };
 
 use memmap2::Mmap;
@@ -60,23 +59,11 @@ pub fn lookup_hash_in_file(directory: &str, target_hash: &str) -> io::Result<Opt
             }
 
             // Perform binary search
-            let binary_search_start: Instant = Instant::now();
             if let Some(found_record) =
                 binary_search(num_records, buffer, target_hash_len, &target_hash_bytes)
             {
-                let binary_search_duration = binary_search_start.elapsed();
-                println!(
-                    "(Record found) Binary search took: {:?}",
-                    binary_search_duration
-                );
                 return Ok(Some(found_record));
             }
-            let binary_search_duration = binary_search_start.elapsed();
-            println!(
-                "(Record not found) Binary search took: {:?}",
-                binary_search_duration
-            );
-
             break;
         }
     }
@@ -99,15 +86,8 @@ fn binary_search(
         let mid_record_end = mid_record_start + RECORD_SIZE;
         let mid_record_bytes = &buffer[mid_record_start..mid_record_end];
 
-        let start_deserialize = Instant::now();
-
         let hash = <[u8; HASH_SIZE]>::try_from(&mid_record_bytes[NONCE_SIZE..])
             .expect("Failed to read hash");
-
-        let deserialize_duration = start_deserialize.elapsed();
-        println!("Deserializing record took: {:?}", deserialize_duration);
-
-        let start_compare = Instant::now();
 
         match hash[..target_hash_len].cmp(&target_hash_bytes.as_slice()) {
             Ordering::Less => left = mid + 1,
@@ -125,9 +105,6 @@ fn binary_search(
                 return Some(found_record);
             }
         }
-
-        let compare_duration = start_compare.elapsed();
-        println!("Comparing record took: {:?}", compare_duration);
     }
 
     return None;

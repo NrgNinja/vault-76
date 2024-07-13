@@ -2,16 +2,16 @@ use crate::Record;
 use std::fs::OpenOptions;
 use std::io::BufWriter;
 use std::io::{self, Write};
-use std::time::Instant;
 
 pub fn store_hashes_chunk(chunk: &[Record], filename: &String) -> io::Result<()> {
-    let start_store_chunk = Instant::now();
-    let path = format!("output/{}", filename);
+    let path = format!("../../output/{}", filename);
+
     let file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(path)?;
+        .open(path)
+        .expect("Failed to open file");
 
     // Collect all serialized records into a single buffer
     let mut writer = BufWriter::new(file);
@@ -27,9 +27,6 @@ pub fn store_hashes_chunk(chunk: &[Record], filename: &String) -> io::Result<()>
     }
 
     writer.flush()?;
-
-    let store_chunk_duration = start_store_chunk.elapsed();
-    println!("Storing chunk took: {:?}", store_chunk_duration);
 
     Ok(())
 }

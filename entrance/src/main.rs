@@ -5,7 +5,7 @@ use rayon::iter::ParallelIterator;
 use rayon::prelude::*;
 use rayon::slice::ParallelSlice;
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, time::Instant};
+use std::time::Instant;
 
 mod hash_generator;
 mod hash_sorter;
@@ -24,14 +24,6 @@ struct Record {
 }
 
 fn main() {
-    // Perform a dummy file operation to prime the file system
-    let dummy_path = "output/dummy_file.bin";
-    let _dummy_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(dummy_path)
-        .expect("Failed to create dummy file");
-
     // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault")
         .version("2.0")
@@ -122,7 +114,7 @@ fn main() {
 
     let target_hash = matches.value_of("target_hash").unwrap_or("0");
 
-    let directory = "output";
+    let directory = "../../output";
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -130,10 +122,10 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let start_vault_timer: Instant = Instant::now();
+    // let start_vault_timer: Instant = Instant::now();
 
     if k != 0 {
-        println!("Populating the vault...");
+        // println!("Populating the vault...");
         let start_hash_gen_timer: Instant = Instant::now();
 
         let mut hashes: Vec<Record> = (0..num_records)
@@ -147,23 +139,27 @@ fn main() {
         let chunk_size: usize = hashes.len() / num_threads;
 
         let hash_gen_duration = start_hash_gen_timer.elapsed();
-        println!(
-            "Generating {} hashes took {:?}",
-            num_records, hash_gen_duration
-        );
+        // println!(
+        //     "Generating {} hashes took {:?}",
+        //     num_records, hash_gen_duration
+        // );
+
+        let mut hash_sort_duration = std::time::Duration::new(0, 0);
 
         // Calls a function that sorts hashes in memory (hash_sorter.rs)
+        let start_hash_sort_timer: Instant = Instant::now();
         if sorting_on {
-            let start_hash_sort_timer: Instant = Instant::now();
             hash_sorter::sort_hashes(&mut hashes);
-            let hash_sort_duration: std::time::Duration = start_hash_sort_timer.elapsed();
-            println!("Sorting hashes took {:?}", hash_sort_duration);
+            // println!("Sorting hashes took {:?}", hash_sort_duration);
+            hash_sort_duration = start_hash_sort_timer.elapsed();
         }
+
+        let mut store_output_duration: std::time::Duration = std::time::Duration::new(0, 0);
 
         // Calls store_hashes function to serialize generated hashes into binary and store them on disk
         if writing_on {
             let start_store_output_timer: Instant = Instant::now();
-            let index_file_path = "output/file_index.bin";
+            let index_file_path = "../../output/file_index.bin";
 
             let results = hashes
                 .par_chunks(chunk_size)
@@ -179,14 +175,11 @@ fn main() {
                 })
                 .collect();
 
-            let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-            println!("Parallel iterator took {:?}", store_output_duration);
-
             store_hashes::create_index_file(index_file_path, results)
                 .expect("Failed to create index file");
 
-            let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-            println!("Writing hashes to disk took {:?}", store_output_duration);
+            store_output_duration = start_store_output_timer.elapsed();
+            // println!("Writing hashes to disk took {:?}", store_output_duration);
 
             if print_index {
                 print_records::print_index_file(index_file_path)
@@ -194,15 +187,19 @@ fn main() {
             }
         }
 
-        let duration = start_vault_timer.elapsed();
-        print!("Generated");
-        if sorting_on {
-            print!(", sorted");
-        }
-        if writing_on {
-            print!(", stored");
-        }
-        println!(" {} records in {:?}", num_records, duration);
+        // let duration = start_vault_timer.elapsed();
+        // print!("Generated");
+        // if sorting_on {
+        //     print!(", sorted");
+        // }
+        // if writing_on {
+        //     print!(", stored");
+        // }
+        // println!(" {} records in {:?}", num_records, duration);
+        println!(
+            "{:?},{:?},{:?}",
+            hash_gen_duration, hash_sort_duration, store_output_duration
+        )
     }
 
     if num_records_to_print != 0 {
@@ -215,19 +212,21 @@ fn main() {
     if target_hash != "0" {
         let start_lookup_timer = Instant::now();
 
+        let mut is_exist: bool = false;
+
         // Single-threaded
         match lookup::lookup_hash_in_file(directory, &target_hash) {
-            Ok(Some(record)) => {
-                let hash = print_records::hash_to_string(&record.hash);
-                let nonce = print_records::nonce_to_decimal(&record.nonce);
+            Ok(Some(_record)) => {
+                // let hash = print_records::hash_to_string(&record.hash);
+                // let nonce = print_records::nonce_to_decimal(&record.nonce);
 
-                println!("FOUND RECORD - Nonce: {}, Hash: {}", nonce, hash);
+                is_exist = true;
             }
-            Ok(None) => println!("RECORD NOT FOUND"),
+            Ok(None) => is_exist = false,
             Err(e) => eprintln!("Error occurred: {}", e),
         }
 
         let lookup_duration = start_lookup_timer.elapsed();
-        println!("Looking up {} hash took {:?}", target_hash, lookup_duration);
+        println!("{},{:?},{}", target_hash, lookup_duration, is_exist);
     }
 }

@@ -1,21 +1,23 @@
 #!/bin/bash
 
-hash=$1
-echo "Hash passed to script: $hash"
+k=$1
+hash_len=$2
 total_duration=0
-cd ../..
 
-echo "Clearing cache..."
-free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
-sleep 5
+# generate file
+output_dir="../../output"
+rm -rf "${output_dir:?}"/*
+./../../target/release/entrance -k $k -t 16
 
-echo "Running the command..."
-output=$(./target/release/entrance -x $hash)
+# add headings
+echo "HashPrefix,LookupTime(ms),IsExist" >lookup_$k"_"$hash_len.csv
 
-# pkill sar
-echo "$output"
+# run lookup
+for i in {1..1000}; do
+    # clean cache
+    free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
+    hash=$(python3 get_hash.py $i $hash_len)
+    ./../../target/release/entrance -x $hash >>lookup_$k"_"$hash_len.csv
+done
 
-total_duration=$(echo "$output" | grep -oP 'Looking up.*hash took \K[0-9]+\.[0-9]+')
-echo "Total duration: $total_duration"
-
-echo
+mv lookup_$k"_"$hash_len.csv lookup_csv/
