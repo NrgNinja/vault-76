@@ -6,7 +6,7 @@ output_dir="../../output"
 k="$1"
 threads="$2"
 
-echo "Generation,Sorting,Writing" >"vault_$threads"t_"$k.csv"
+echo "Generation,Sorting,Writing" >vault_csv/vault_$threads"t_"$k.csv
 
 for n in {1..10}; do
     # Clean the output directory
@@ -17,7 +17,5 @@ for n in {1..10}; do
     sleep 5
 
     # Capture the output of the program
-    ./../../target/release/entrance -k $k -t $threads >>"vault_$threads"t_"$k.csv"
+    ./../../target/release/entrance -k $k -t $threads >>vault_csv/vault_$threads"t_"$k.csv
 done
-
-mv "vault_$threads"t_"$k.csv" vault_csv/
