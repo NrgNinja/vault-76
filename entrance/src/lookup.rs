@@ -11,19 +11,22 @@ const PREFIX_LENGTH: usize = 2;
 
 // this function reads the records from the output file, deserializes them and then prints them
 pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
-    let path = PathBuf::from("output").join(filename);
+    // let path = PathBuf::from("output").join(filename);
+    // use the one below when you want to cargo run from the benchmark folder
+    let path = PathBuf::from("./../../output").join(filename);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
-    let mut count = 0;
+    let mut _count = 0;
 
     let start_time = Instant::now();
+    let mut is_exist: bool = false;
 
     // TODO: we can later change this number, 4, to match the prefix length
     let (offset, size) = find_offset_for_prefix(&prefix[..(PREFIX_LENGTH * 2)])?;
     reader.seek(SeekFrom::Start(offset))?;
 
-    println!("{:<16} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
-    println!("{}", "-".repeat(88));
+    // println!("{:<16} | {:<64}", "Nonce (Decimal)", "Hash (Hex)");
+    // println!("{}", "-".repeat(88));
 
     let end_offset = offset + size;
     let mut current_offset = offset;
@@ -33,23 +36,29 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
         match deserialize_next_record(&mut reader) {
             Ok(Some(record)) => {
                 if record_matches_prefix(&record, prefix) {
-                    count += 1;
-                    let nonce_decimal = nonce_to_decimal(&record.nonce);
-                    let hash_hex = hash_to_string(&record.hash);
-                    println!("{:<16} | {}", nonce_decimal, hash_hex);
+                    _count += 1;
+                    let _nonce_decimal = nonce_to_decimal(&record.nonce);
+                    let _hash_hex = hash_to_string(&record.hash);
+                    // println!("{:<16} | {}", nonce_decimal, hash_hex);
+                    is_exist = true;
                 }
                 current_offset += std::mem::size_of::<Record>() as u64;
             }
-            Ok(None) => break,
+            Ok(None) => {
+                is_exist = false;
+                break;
+            },
             Err(e) => return Err(e),
         }
     }
 
     let duration = start_time.elapsed();
-    println!(
-        "\nFound {} records in {:?} matching the prefix '{}'",
-        count, duration, prefix
-    );
+    // println!(
+    //     "\nFound {} records in {:?} matching the prefix '{}'",
+    //     count, duration, prefix
+    // );
+
+    println!("{},{:?},{}", prefix, duration, is_exist);
 
     Ok(())
 }
@@ -89,7 +98,9 @@ fn record_matches_prefix(record: &Record, prefix: &str) -> bool {
 
 // find the offset and size of the bucket for the given prefix
 fn find_offset_for_prefix(prefix: &str) -> io::Result<(u64, u64)> {
-    let metadata_path = PathBuf::from("output").join("metadata.bin");
+    // let metadata_path = PathBuf::from("output").join("metadata.bin");
+    // use the one below when you want to cargo run from the benchmark folder
+    let metadata_path = PathBuf::from("./../../output").join("metadata.bin");
     let metadata_file = File::open(metadata_path)?;
     let mut metadata_reader = BufReader::new(metadata_file);
 

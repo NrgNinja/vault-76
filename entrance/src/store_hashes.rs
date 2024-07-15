@@ -13,7 +13,9 @@ const BUFFER_SIZE: usize = 128 * 1024; // 128 KB
 
 // multi-threaded approach where threads write to different parts of the file
 pub fn store_hashes_optimized(map: &DashMap<u64, Vec<Record>>, filename: &str) -> io::Result<()> {
-    let path = PathBuf::from("output").join(filename);
+    // let path = PathBuf::from("output").join(filename);
+    // use the one below when you want to cargo run from the benchmark folder
+    let path = PathBuf::from("./../../output").join(filename);
     let file_size = calculate_total_size(&map);
 
     // create a sparse file of a determined size
@@ -65,7 +67,10 @@ pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> io::Result<Vec<(u64, 
     let mut keys: Vec<u64> = map.iter().map(|entry| *entry.key()).collect();
     keys.par_sort_unstable(); // sort keys in parallel
 
-    let path = PathBuf::from("output").join("metadata.bin");
+    // let path = PathBuf::from("output").join("metadata.bin");
+    // use the one below when you want to cargo run from the benchmark folder
+    let path = PathBuf::from("./../../output").join("metadata.bin");
+
     let metadata_file = OpenOptions::new().write(true).create(true).open(path)?;
     let mut metadata_writer = BufWriter::new(metadata_file);
 

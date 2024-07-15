@@ -128,10 +128,10 @@ fn main() {
         });
 
     let generation_duration = generation_start.elapsed();
-    println!(
-        "Hash generation & storing into DashMap took {:?}",
-        generation_duration
-    );
+    // println!(
+    //     "Hash generation & storing into DashMap took {:?}",
+    //     generation_duration
+    // );
 
     let storage_start = Instant::now();
 
@@ -141,13 +141,13 @@ fn main() {
     }
 
     let storage_duration = storage_start.elapsed();
-    println!("Writing hashes to disk took about {:?}", storage_duration);
+    // println!("Writing hashes to disk took about {:?}", storage_duration);
 
-    let total_duration = generation_duration + storage_duration;
+    // let total_duration = generation_duration + storage_duration;
 
     // check the contents of the map
-    let num_keys = map.len();
-    let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
+    // let num_keys = map.len();
+    // let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
 
     // if you want to see details of each prefix bucket, uncomment the following lines
     // let mut keys_with_counts: Vec<(u64, usize)> = map
@@ -162,9 +162,14 @@ fn main() {
     //     println!("Prefix bucket {} has {} records", prefix_hex, count);
     // }
 
+    // println!(
+    //     "Time taken for {} parallel insertions into {} buckets using {} threads: {:?}",
+    //     total_records, num_keys, num_threads, total_duration
+    // );
+
     println!(
-        "Time taken for {} parallel insertions into {} buckets using {} threads: {:?}",
-        total_records, num_keys, num_threads, total_duration
+        "{:?},{:?}",
+        generation_duration, storage_duration
     );
 
     // if you specify a number of records to print to the screen; for debugging purposes
