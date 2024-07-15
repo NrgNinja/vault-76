@@ -6,3 +6,7 @@ entrance/output/*
 entrance/stats/*
 .ipynb_checkpoints/
 output.zip
+entrance/src/benchmark/lookup_csv/*
+entrance/src/benchmark/vault_csv/*
+entrance/src/benchmark/lookup_plot/*
+entrance/src/benchmark/vault_plot/*

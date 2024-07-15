@@ -12,7 +12,7 @@ sync
 sleep 2
 
 free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
-sudo sync
+sync
 sleep 5
 
 # sar -u 1 >stats/cpu/cpu-stats_$k$threads.txt &

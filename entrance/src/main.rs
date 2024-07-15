@@ -156,7 +156,7 @@ fn main() {
 
         let mut store_output_duration: std::time::Duration = std::time::Duration::new(0, 0);
 
-        // Calls store_hashes function to serialize generated hashes into binary and store them on disk
+        // Calls store_hashes function to serialize generated hashes into binary and store them on disk -- sometimes takes 4-8sec
         if writing_on {
             let start_store_output_timer: Instant = Instant::now();
             let index_file_path = "../../output/file_index.bin";
