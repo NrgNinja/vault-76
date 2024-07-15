@@ -5,7 +5,7 @@ def strip_last(lookup_time):
     if lookup_time[-2:] == "ms":
         return lookup_time[:-2]
     elif lookup_time[-2:] == "µs":
-        return float(lookup_time[:-2]) / 1000 
+        return float(lookup_time[:-2]) / 1000
 
 for k in [25, 30]:
     for hash_len in [4, 8, 12]:
@@ -20,11 +20,11 @@ for k in [25, 30]:
         found_false = df[df["IsExist"] == False]
         
         fig, ax = plt.subplots()
-        plt.scatter(found_true.index, found_true["LookupTime(ms)"], label=f'', s=2, color="green")
-        plt.scatter(found_false.index, found_false["LookupTime(ms)"], label=f'', s=2, color="red")
+        plt.scatter(found_true.index, found_true["LookupTime(ms)"], label='Found', s=2, color="green")
+        plt.scatter(found_false.index, found_false["LookupTime(ms)"], label='Not Found', s=2, color="red")
         
         avg_lookup_time = df["LookupTime(ms)"].mean()
-        plt.axhline(y=avg_lookup_time, color="blue", linestyle="-", linewidth=1, label="average")
+        plt.axhline(y=avg_lookup_time, color="blue", linestyle="-", linewidth=1, label="Average")
         plt.text(0.5, avg_lookup_time, f'{avg_lookup_time:.2f} ms', color='blue', weight='bold',
                  verticalalignment='bottom', horizontalalignment='center', transform=ax.get_yaxis_transform())
         
