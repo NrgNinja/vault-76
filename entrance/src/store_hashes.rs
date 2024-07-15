@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::process::Command;
 
 pub fn store_hashes_chunk(chunk: &[Record], filename: &String) -> io::Result<()> {
-    let path = format!("../../output/{}", filename);
+    let path = format!("output/{}", filename);
     let path = path.as_str();
 
     let size = chunk.len() * RECORD_SIZE;
@@ -25,7 +25,7 @@ pub fn store_hashes_chunk(chunk: &[Record], filename: &String) -> io::Result<()>
         .expect("Failed to open file");
 
     // Collect all serialized records into a single buffer
-    let mut writer = BufWriter::new(file);
+    let mut writer = BufWriter::new(&file);
 
     // Writing directly (without using any serializer) is faster
     for record in chunk {
@@ -39,6 +39,8 @@ pub fn store_hashes_chunk(chunk: &[Record], filename: &String) -> io::Result<()>
 
     writer.flush()?;
 
+    file.sync_all()?;
+
     Ok(())
 }
 
@@ -49,7 +51,7 @@ pub fn create_index_file(path: &str, results: Vec<(String, String, String)>) -> 
         .truncate(true)
         .open(path)?;
 
-    let mut writer = BufWriter::new(file);
+    let mut writer = BufWriter::new(&file);
 
     for result in results {
         writer
@@ -57,6 +59,8 @@ pub fn create_index_file(path: &str, results: Vec<(String, String, String)>) -> 
             .expect("Failed to write to index file");
     }
     writer.flush()?;
+
+    file.sync_all()?;
 
     Ok(())
 }

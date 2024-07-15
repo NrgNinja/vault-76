@@ -114,7 +114,7 @@ fn main() {
 
     let target_hash = matches.value_of("target_hash").unwrap_or("0");
 
-    let directory = "../../output";
+    let directory = "output";
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -159,7 +159,7 @@ fn main() {
         // Calls store_hashes function to serialize generated hashes into binary and store them on disk -- sometimes takes 4-8sec
         if writing_on {
             let start_store_output_timer: Instant = Instant::now();
-            let index_file_path = "../../output/file_index.bin";
+            let index_file_path = "output/file_index.bin";
 
             let results = hashes
                 .par_chunks(chunk_size)
