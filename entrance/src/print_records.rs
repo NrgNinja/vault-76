@@ -19,7 +19,7 @@ fn hash_to_string(hash: &[u8; 26]) -> String {
 
 // this function reads the records from the output file, deserializes them and then prints them
 pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
-    let path = "output/output.bin";
+    let path = "./../../output/output.bin";
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 

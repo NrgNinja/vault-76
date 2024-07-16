@@ -2,14 +2,16 @@
 use crate::Record;
 use dashmap::DashMap;
 // use heapless::Vec as HeaplessVec;
-use rayon::prelude::*;
+// use rayon::prelude::*;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
+use std::sync::RwLock;
 // use std::time::Instant;
 // use std::fs::File;
 
 // const BUFFER_SIZE: usize = 128 * 1024; // 128 KB
+const RECORD_SIZE: usize = 32; // 32 bytes
 
 // // multi-threaded approach where threads write to different parts of the file
 // pub fn store_hashes_optimized(
@@ -82,26 +84,28 @@ use std::path::PathBuf;
 //     Ok(offsets)
 // }
 
-pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str) -> io::Result<()> {
+
+pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str, offsets: &RwLock<Vec<usize>>) -> io::Result<()> {
     let path: PathBuf = PathBuf::from("./../../output").join(filename);
     let file = OpenOptions::new()
         .write(true)
         .create(true)
-        .truncate(true)
+        .append(false) // Not appending, as we need precise control over where we write
         .open(path)?;
 
     let mut writer = BufWriter::new(&file);
 
     for entry in records.iter() {
-        let (_prefix, records) = entry.pair();
+        let (prefix, records) = entry.pair();
+        let mut offsets = offsets.write().unwrap(); // Acquire write lock on offsets
+        let offset = offsets[*prefix]; // Get current offset for this bucket
+
+        writer.seek(SeekFrom::Start(offset as u64))?; // Move to the correct position in the file
 
         for record in records {
-            writer
-                .write_all(&record.nonce)
-                .expect("Failed to write nonce");
-            writer
-                .write_all(&record.hash)
-                .expect("Failed to write hash");
+            writer.write_all(&record.nonce)?;
+            writer.write_all(&record.hash)?;
+            offsets[*prefix] += RECORD_SIZE; // Update offset after writing
         }
     }
     writer.flush()?;

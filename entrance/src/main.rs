@@ -4,6 +4,8 @@ use dashmap::DashMap;
 use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::os::unix::thread;
+use std::sync::RwLock;
 use std::time::Instant;
 use store_hashes::flush_to_disk;
 
@@ -122,34 +124,42 @@ fn main() {
     let dashmap_capacity = memory_limit / RECORD_SIZE;
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
+    let thread_memory_limit; // in bytes
 
     if total_memory < memory_limit {
-        memory_limit = total_memory;
+        thread_memory_limit = total_memory / num_threads;
+    } else {
+        thread_memory_limit = memory_limit / num_threads; // in bytes
     }
-    let thread_memory_limit = memory_limit / num_threads; // in bytes
+    let mut total_generated = 0;
 
-    let offset_vector: Vec<(u64, usize, usize)> = Vec::new();
+    let num_buckets = 1 << (prefix_length * 8); // Calculate number of buckets
+    let offsets_vector: RwLock<Vec<usize>> = RwLock::new(vec![0; num_buckets]);
 
     let generation_start: Instant = Instant::now();
 
-    (0..num_threads).into_par_iter().for_each(|thread_index| {
-        let mut local_size = 0;
-        let mut nonce: u64 = (thread_index * (thread_memory_limit / RECORD_SIZE))
-            .try_into()
-            .unwrap();
+    while total_generated < total_memory {
+        (0..num_threads).into_par_iter().for_each(|thread_index| {
+            let mut local_size = 0;
+            let mut nonce: u64 = (thread_index * (thread_memory_limit / RECORD_SIZE))
+                .try_into()
+                .unwrap();
 
-        while local_size < std::cmp::min(thread_memory_limit, total_memory) {
-            let (prefix, record) = generate_hash(nonce, prefix_length);
+            while local_size < std::cmp::min(thread_memory_limit, total_memory) {
+                let (prefix, record) = generate_hash(nonce, prefix_length);
 
-            local_size += RECORD_SIZE;
-            nonce += 1;
+                local_size += RECORD_SIZE;
+                nonce += 1;
 
-            let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
-            records.push(record);
-        }
-    });
+                let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
+                records.push(record);
+            }
+        });
 
-    flush_to_disk(&map, &output_file).expect("Error flushing to disk");
+        flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
+        total_generated += thread_memory_limit * num_threads;
+        map.clear();
+    }
 
     // Assuming record generation and processing - og version
     // (0..num_records)
@@ -200,10 +210,20 @@ fn main() {
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    // if num_records_to_print != 0 {
-    //     match print_records::print_records(output_file, num_records_to_print) {
-    //         Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-    //         Err(e) => eprintln!("Error deserializing hashes: {}", e),
-    //     }
+    let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
+    println!(
+        "Length of the offsets vector: {}",
+        offsets_vector_read.len()
+    );
+
+    // for (index, offset) in offsets_vector_read.iter().enumerate() {
+    //     println!("Offset[{}]: {}", index, offset);
     // }
+
+    if num_records_to_print != 0 {
+        match print_records::print_records_from_file(num_records_to_print) {
+            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+            Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
+    }
 }
