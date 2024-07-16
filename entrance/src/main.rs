@@ -1,10 +1,13 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
 use dashmap::DashMap;
+use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::cmp;
 use std::collections::HashMap;
 use std::time::Instant;
+use store_hashes::flush_to_disk;
 
 mod hash_generator;
 mod lookup;
@@ -123,6 +126,11 @@ fn main() {
         .parse::<usize>()
         .unwrap();
 
+    let output_file = matches
+        .value_of("filename")
+        .unwrap_or("output.bin")
+        .to_string();
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
@@ -131,46 +139,54 @@ fn main() {
 
     let records_per_thread = memory_limit / (num_threads * RECORD_SIZE);
 
-    let total_memory = num_records * RECORD_SIZE as u64;
+    let total_memory: usize = (num_records * RECORD_SIZE as u64).try_into().unwrap(); // in bytes
     let dashmap_capacity = memory_limit / RECORD_SIZE;
-    let thread_memory_limit = memory_limit / num_threads;
+    let thread_memory_limit = memory_limit / num_threads; // in bytes
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
 
-    let output_file = matches
-        .value_of("filename")
-        .unwrap_or("output.bin")
-        .to_string();
-
     let generation_start = Instant::now();
 
-    let mut _offset_map: Vec<u64> = Vec::with_capacity(); // key: bucket_prefix, value: file_offset
+    (0..num_threads).into_par_iter().for_each(|thread_index| {
+        let mut local_size = 0;
+        let mut nonce: u64 = (thread_index * (thread_memory_limit / RECORD_SIZE))
+            .try_into()
+            .unwrap();
 
-    // Assuming record generation and processing
-    (0..num_records)
-        .into_par_iter()
-        .map(|nonce| hash_generator::generate_hash(nonce, prefix_length))
-        .for_each(|(prefix, record)| {
-            let mut records = map.entry(prefix).or_insert_with(Vec::new);
+        while local_size < std::cmp::min(thread_memory_limit, total_memory) {
+            let (prefix, record) = generate_hash(nonce, prefix_length);
+
+            local_size += RECORD_SIZE;
+            nonce += 1;
+
+            let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
             records.push(record);
+        }
+    });
 
-            if records.len() * RECORD_SIZE >= thread_memory_limit {
-                
-            }
-        })
-        // .for_each(|(prefix, record)| {
-        //     let mut records = map.entry(prefix).or_insert_with(Vec::new);
-        //     if records.len() >= records_per_thread {
-        //         store_hashes::flush_to_disk(&records, &output_file);
-        //         records.clear();
-        //     }
-        //     records.push(record);
-        // });
+    println!("{}", total_memory);
+    println!("{}", thread_memory_limit);
+    println!("{}", std::cmp::min(thread_memory_limit, total_memory));
+
+    flush_to_disk(&map, &output_file).expect("Error flushing to disk");
+
+    // Assuming record generation and processing - og version
+    // (0..num_records)
+    //     .into_par_iter()
+    //     .map(|nonce| hash_generator::generate_hash(nonce, prefix_length))
+    //     .for_each(|(prefix, record)| {
+    //         let mut records = map.entry(prefix).or_insert_with(Vec::new);
+    //         if records.len() >= records_per_thread {
+    //             store_hashes::flush_to_disk(&records, &output_file);
+    //             records.clear();
+    //         }
+    //         records.push(record);
+    //     });
 
     // Flush remaining records in the map
-    for (prefix, records) in map {
-        store_hashes::flush_to_disk(&records, &output_file);
-    }
+    // for (prefix, records) in map {
+    //     store_hashes::flush_to_disk(&records, &output_file);
+    // }
 
     let generation_duration = generation_start.elapsed();
     // println!(
@@ -181,14 +197,14 @@ fn main() {
     let storage_start = Instant::now();
 
     // if an output file is specified by the command line, it will write to that file
-    if !output_file.is_empty() {
-        let _ = store_hashes::store_hashes_optimized(
-            &map,
-            &output_file,
-            memory_limit_bytes,
-            RECORD_SIZE,
-        );
-    }
+    // if !output_file.is_empty() {
+    //     let _ = store_hashes::store_hashes_optimized(
+    //         &map,
+    //         &output_file,
+    //         memory_limit_bytes,
+    //         RECORD_SIZE,
+    //     );
+    // }
 
     let storage_duration = storage_start.elapsed();
     // println!("Writing hashes to disk took about {:?}", storage_duration);
