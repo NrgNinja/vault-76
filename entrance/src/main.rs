@@ -120,7 +120,7 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid integer for prefix length");
 
-    let memory_limit = matches
+    let mut memory_limit = matches
         .value_of("memory")
         .unwrap_or("2147483648") // make sure to write it in bytes
         .parse::<usize>()
@@ -137,15 +137,17 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let records_per_thread = memory_limit / (num_threads * RECORD_SIZE);
-
     let total_memory: usize = (num_records * RECORD_SIZE as u64).try_into().unwrap(); // in bytes
     let dashmap_capacity = memory_limit / RECORD_SIZE;
-    let thread_memory_limit = memory_limit / num_threads; // in bytes
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
+    
+    if total_memory < memory_limit {
+        memory_limit = total_memory;
+    }
+    let thread_memory_limit = memory_limit / num_threads; // in bytes
 
-    let generation_start = Instant::now();
+    let generation_start: Instant = Instant::now();
 
     (0..num_threads).into_par_iter().for_each(|thread_index| {
         let mut local_size = 0;
@@ -165,7 +167,7 @@ fn main() {
     });
 
     println!("{}", total_memory);
-    println!("{}", thread_memory_limit);
+    println!("{}", memory_limit);
     println!("{}", std::cmp::min(thread_memory_limit, total_memory));
 
     flush_to_disk(&map, &output_file).expect("Error flushing to disk");
