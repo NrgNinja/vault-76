@@ -164,10 +164,6 @@ fn main() {
         }
     });
 
-    println!("{}", total_memory);
-    println!("{}", thread_memory_limit);
-    println!("{}", std::cmp::min(thread_memory_limit, total_memory));
-
     flush_to_disk(&map, &output_file).expect("Error flushing to disk");
 
     // Assuming record generation and processing - og version
