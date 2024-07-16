@@ -31,6 +31,7 @@ pub fn store_hashes_optimized(map: &DashMap<u64, Vec<Record>>, filename: &str) -
             let records = map.get(&key).unwrap();
             let mut local_file = OpenOptions::new().write(true).open(&path)?;
             local_file.seek(SeekFrom::Start(offset as u64))?;
+            // let mut local_writer = BufWriter::with_capacity(BUFFER_SIZE, local_file);
             let mut local_writer = BufWriter::with_capacity(BUFFER_SIZE, &local_file);
 
             let mut total_written = 0; // amount of data written; debugging purposes
