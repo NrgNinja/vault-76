@@ -128,6 +128,8 @@ fn main() {
     }
     let thread_memory_limit = memory_limit / num_threads; // in bytes
 
+    let offset_vector: Vec<(u64, usize, usize)> = Vec::new();
+
     let generation_start: Instant = Instant::now();
 
     (0..num_threads).into_par_iter().for_each(|thread_index| {
