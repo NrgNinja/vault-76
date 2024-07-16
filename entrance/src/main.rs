@@ -3,6 +3,7 @@ use clap::{App, Arg};
 use dashmap::DashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Instant;
 
 mod hash_generator;
@@ -75,6 +76,13 @@ fn main() {
                 .takes_value(true)
                 .help("Lookup a record by nonce, hash, or prefix"),
         )
+        .arg(
+            Arg::with_name("memory")
+                .short('m')
+                .long("memory")
+                .takes_value(true)
+                .help("Limit the amount of memory to this size (in bytes)"),
+        )
         .get_matches();
 
     // determine if lookup is specified, otherwise continue normal vault operations
@@ -107,7 +115,11 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid integer for prefix length");
 
-    let map = DashMap::new();
+    let memory_limit = matches
+        .value_of("memory")
+        .unwrap_or("2147483648") // make sure to write it in bytes
+        .parse::<usize>()
+        .unwrap();
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -115,17 +127,37 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let output_file = matches.value_of("filename").unwrap_or("");
+    let record_size = 32; // records are 32 bytes each
+    let records_per_thread = memory_limit / (num_threads * record_size);
+
+    let map = DashMap::new();
+
+    let output_file = matches
+        .value_of("filename")
+        .unwrap_or("output.bin")
+        .to_string();
 
     let generation_start = Instant::now();
 
-    // generate hashes in parallel and store them into a DashMap data structure
+    let mut _offset_map: HashMap<u64, usize> = HashMap::new(); // key: bucket_prefix, value: file_offset
+
+    // Assuming record generation and processing
     (0..num_records)
         .into_par_iter()
         .map(|nonce| hash_generator::generate_hash(nonce, prefix_length))
         .for_each(|(prefix, record)| {
-            map.entry(prefix).or_insert_with(Vec::new).push(record);
+            let mut records = map.entry(prefix).or_insert_with(Vec::new);
+            if records.len() >= records_per_thread {
+                store_hashes::flush_to_disk(&records, &output_file);
+                records.clear();
+            }
+            records.push(record);
         });
+
+    // Flush remaining records in the map
+    for (prefix, records) in map {
+        store_hashes::flush_to_disk(&records, &output_file);
+    }
 
     let generation_duration = generation_start.elapsed();
     // println!(
@@ -137,7 +169,12 @@ fn main() {
 
     // if an output file is specified by the command line, it will write to that file
     if !output_file.is_empty() {
-        let _ = store_hashes::store_hashes_optimized(&map, output_file);
+        let _ = store_hashes::store_hashes_optimized(
+            &map,
+            &output_file,
+            memory_limit_bytes,
+            record_size,
+        );
     }
 
     let storage_duration = storage_start.elapsed();
@@ -167,10 +204,7 @@ fn main() {
     //     total_records, num_keys, num_threads, total_duration
     // );
 
-    println!(
-        "{:?},{:?}",
-        generation_duration, storage_duration
-    );
+    println!("{:?},{:?}", generation_duration, storage_duration);
 
     // if you specify a number of records to print to the screen; for debugging purposes
     if let Some(num_records_to_print) = matches
