@@ -1,11 +1,13 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
+use dashmap::DashMap;
+use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
+use store_hashes::flush_to_disk;
 
 mod hash_generator;
-mod hash_sorter;
 mod print_records;
 mod store_hashes;
 
@@ -16,6 +18,8 @@ struct Record {
     nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
     hash: [u8; 26],
 }
+
+const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 
 fn main() {
     // defines letters for arguments that the user can call from command line
@@ -58,6 +62,12 @@ fn main() {
                 .default_value("1") 
                 .help("Number of threads to use for hash generation"),
         )
+        .arg(Arg::with_name("memory_limit")
+        .short('m')
+        .long("memory_limit")
+        .takes_value(true)
+        .help("Limit memory"),)
+        .arg(Arg::with_name("prefix_length").short('x').long("prefix").takes_value(true).help("Specify the prefix length to extract from the hash"))
         .get_matches();
 
     let k = matches
@@ -88,17 +98,31 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
 
+    let mut memory_limit = matches
+        .value_of("memory_limit")
+        .unwrap_or("2147483648")
+        .parse::<usize>()
+        .expect("Please provide a valid number for memory_limit");
+
+    let prefix_length = matches
+        .value_of("prefix_length")
+        .unwrap_or("2")
+        .parse::<usize>()
+        .expect("Please provide a valid number for prefix_length");
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
         .unwrap();
 
+    let start_vault_timer = Instant::now();
+
     let total_memory: usize = (num_records * RECORD_SIZE as u64).try_into().unwrap(); // in bytes
     let dashmap_capacity = memory_limit / RECORD_SIZE;
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
-    
+
     if total_memory < memory_limit {
         memory_limit = total_memory;
     }
@@ -122,10 +146,6 @@ fn main() {
             records.push(record);
         }
     });
-
-    println!("{}", total_memory);
-    println!("{}", memory_limit);
-    println!("{}", std::cmp::min(thread_memory_limit, total_memory));
 
     flush_to_disk(&map, &output_file).expect("Error flushing to disk");
 
@@ -165,8 +185,8 @@ fn main() {
     //     );
     // }
 
-    let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-    println!("Writing hashes to disk took {:?}", store_output_duration);
+    // let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+    // println!("Writing hashes to disk took {:?}", store_output_duration);
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
@@ -178,10 +198,10 @@ fn main() {
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    if num_records_to_print != 0 {
-        match print_records::print_records(output_file, num_records_to_print) {
-            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
-            Err(e) => eprintln!("Error deserializing hashes: {}", e),
-        }
-    }
+    // if num_records_to_print != 0 {
+    //     match print_records::print_records(output_file, num_records_to_print) {
+    //         Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+    //         Err(e) => eprintln!("Error deserializing hashes: {}", e),
+    //     }
+    // }
 }
