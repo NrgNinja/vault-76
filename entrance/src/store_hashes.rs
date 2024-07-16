@@ -84,16 +84,19 @@ pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> io::Result<Vec<(u64, 
 }
 
 pub fn flush_to_disk(records: &[Record], filename: &str) -> io::Result<()> {
-    let path = PathBuf::from("./../../output").join(filename);
+    let path: PathBuf = PathBuf::from("./../../output").join(filename);
     let mut file = OpenOptions::new().write(true).append(true).open(path)?;
+
+    let mut writer = BufWriter::new(&file);
     for record in records {
-        let data = serialize_record(record)?;
-        file.write_all(&data)?;
+        writer
+            .write_all(&record.nonce)
+            .expect("Failed to write nonce");
+        writer
+            .write_all(&record.hash)
+            .expect("Failed to write hash");
     }
+    writer.flush();
     file.sync_all()?;
     Ok(())
-}
-
-fn serialize_record(record: &Record) -> io::Result<Vec<u8>> {
-    to_io(record).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
 }

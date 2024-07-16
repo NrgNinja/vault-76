@@ -139,7 +139,7 @@ fn main() {
 
     let generation_start = Instant::now();
 
-    let mut _offset_map: HashMap<u64, usize> = HashMap::new(); // key: bucket_prefix, value: file_offset
+    let mut _offset_map: Vec<u64> = HashMap::new(); // key: bucket_prefix, value: file_offset
 
     // Assuming record generation and processing
     (0..num_records)
