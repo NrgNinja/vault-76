@@ -1,40 +1,32 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
-use dashmap::DashMap;
-use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::cmp;
-use std::collections::HashMap;
 use std::time::Instant;
-use store_hashes::flush_to_disk;
 
 mod hash_generator;
-mod lookup;
+mod hash_sorter;
 mod print_records;
 mod store_hashes;
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 
 struct Record {
     nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
     hash: [u8; 26],
 }
 
-const RECORD_SIZE: usize = 32; // records are 32 bytes each
-
-// this method uses a DashMap to store prefixes
 fn main() {
     // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault")
         .version("2.0")
-        .about("Generates hashes for unique nonces using BLAKE3 hashing function.")
+        .about("Generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a vector, sort them accordingly, and even look them up efficiently.")
         .arg(
             Arg::with_name("k-value")
-                .short('k') // you can change these flags
+                .short('k') // you can change this flag
                 .long("k-value")
-                .takes_value(true)
+                .takes_value(true) // there must be a number inputted
                 .help("Specify k value to compute 2^k nonces"),
         )
         .arg(
@@ -52,14 +44,6 @@ fn main() {
                 .help("Number of records to print"),
         )
         .arg(
-            Arg::with_name("threads")
-                .short('t')
-                .long("threads")
-                .takes_value(true)
-                .default_value("1")
-                .help("Number of threads to use for hash generation"),
-        )
-        .arg(
             Arg::with_name("sorting_on")
                 .short('s')
                 .long("sorting_on")
@@ -67,44 +51,20 @@ fn main() {
                 .help("Turn sorting on/off"),
         )
         .arg(
-            Arg::with_name("prefix-length")
-                .short('x')
-                .long("prefix-length")
+            Arg::with_name("threads")
+                .short('t')
+                .long("threads")
                 .takes_value(true)
-                .default_value("2") // set a default value or make it required
-                .help("Specify the prefix length in bytes to categorize the hashes"),
-        )
-        .arg(
-            Arg::with_name("lookup")
-                .short('l')
-                .long("lookup")
-                .takes_value(true)
-                .help("Lookup a record by nonce, hash, or prefix"),
-        )
-        .arg(
-            Arg::with_name("memory")
-                .short('m')
-                .long("memory")
-                .takes_value(true)
-                .help("Limit the amount of memory to this size (in bytes)"),
+                .default_value("1") 
+                .help("Number of threads to use for hash generation"),
         )
         .get_matches();
-
-    // determine if lookup is specified, otherwise continue normal vault operations
-    if let Some(lookup_value) = matches.value_of("lookup") {
-        if let Err(e) =
-            lookup::lookup_by_prefix(matches.value_of("filename").unwrap_or(""), lookup_value)
-        {
-            eprintln!("Error during lookup: {}", e);
-        }
-        return;
-    }
 
     let k = matches
         .value_of("k-value")
         .unwrap_or("0")
         .parse::<u32>()
-        .unwrap();
+        .expect("Please provide a valid integer for k");
 
     let num_records = 2u64.pow(k);
 
@@ -112,24 +72,21 @@ fn main() {
         .value_of("threads")
         .unwrap_or("4")
         .parse::<usize>()
-        .unwrap();
+        .expect("Please provide a valid number for threads");
 
-    let prefix_length = matches
-        .value_of("prefix-length")
-        .unwrap_or("2")
-        .parse::<usize>()
-        .expect("Please provide a valid integer for prefix length");
+    let num_records_to_print = matches
+        .value_of("print")
+        .unwrap_or("0")
+        .parse::<u64>()
+        .expect("Please provide a valid number of records to print");
 
-    let mut memory_limit = matches
-        .value_of("memory")
-        .unwrap_or("2147483648") // make sure to write it in bytes
-        .parse::<usize>()
-        .unwrap();
+    let mut output_file = matches.value_of("filename").unwrap_or("");
 
-    let output_file = matches
-        .value_of("filename")
-        .unwrap_or("output.bin")
-        .to_string();
+    let sorting_on = matches
+        .value_of("sorting_on")
+        .unwrap_or("true")
+        .parse::<bool>()
+        .expect("Please provide a valid value for sorting_on (true/false)");
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -208,40 +165,23 @@ fn main() {
     //     );
     // }
 
-    let storage_duration = storage_start.elapsed();
-    // println!("Writing hashes to disk took about {:?}", storage_duration);
+    let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+    println!("Writing hashes to disk took {:?}", store_output_duration);
 
-    // let total_duration = generation_duration + storage_duration;
+    let duration = start_vault_timer.elapsed();
+    print!("Generated");
+    if sorting_on {
+        print!(", sorted");
+    }
+    if !output_file.is_empty() {
+        print!(", stored");
+    }
+    println!(" {} records in {:?}", num_records, duration);
 
-    // check the contents of the map
-    // let num_keys = map.len();
-    // let total_records = map.iter().map(|entry| entry.value().len()).sum::<usize>();
-
-    // if you want to see details of each prefix bucket, uncomment the following lines
-    // let mut keys_with_counts: Vec<(u64, usize)> = map
-    //     .iter()
-    //     .map(|entry| (*entry.key(), entry.value().len()))
-    //     .collect();
-
-    // keys_with_counts.sort_by_key(|k| k.0);
-
-    // for (key, count) in keys_with_counts {
-    //     let prefix_hex = format!("{:x}", key); // convert numeric prefix to hex
-    //     println!("Prefix bucket {} has {} records", prefix_hex, count);
-    // }
-
-    // println!(
-    //     "Time taken for {} parallel insertions into {} buckets using {} threads: {:?}",
-    //     total_records, num_keys, num_threads, total_duration
-    // );
-
-    println!("{:?},{:?}", generation_duration, storage_duration);
-
-    // if you specify a number of records to print to the screen; for debugging purposes
-    if let Some(num_records_to_print) = matches
-        .value_of("print")
-        .map(|v| v.parse::<usize>().unwrap())
-    {
-        print_records::print_records_from_file(num_records_to_print as u64).unwrap();
+    if num_records_to_print != 0 {
+        match print_records::print_records(output_file, num_records_to_print) {
+            Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
+            Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
     }
 }
