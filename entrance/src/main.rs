@@ -19,6 +19,8 @@ struct Record {
     hash: [u8; 26],
 }
 
+const RECORD_SIZE: usize = 32; // records are 32 bytes each
+
 // this method uses a DashMap to store prefixes
 fn main() {
     // defines letters for arguments that the user can call from command line
@@ -127,10 +129,13 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let record_size = 32; // records are 32 bytes each
-    let records_per_thread = memory_limit / (num_threads * record_size);
+    let records_per_thread = memory_limit / (num_threads * RECORD_SIZE);
 
-    let map = DashMap::new();
+    let total_memory = num_records * RECORD_SIZE as u64;
+    let dashmap_capacity = memory_limit / RECORD_SIZE;
+    let thread_memory_limit = memory_limit / num_threads;
+
+    let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
 
     let output_file = matches
         .value_of("filename")
@@ -139,7 +144,7 @@ fn main() {
 
     let generation_start = Instant::now();
 
-    let mut _offset_map: Vec<u64> = HashMap::new(); // key: bucket_prefix, value: file_offset
+    let mut _offset_map: Vec<u64> = Vec::with_capacity(); // key: bucket_prefix, value: file_offset
 
     // Assuming record generation and processing
     (0..num_records)
@@ -147,12 +152,20 @@ fn main() {
         .map(|nonce| hash_generator::generate_hash(nonce, prefix_length))
         .for_each(|(prefix, record)| {
             let mut records = map.entry(prefix).or_insert_with(Vec::new);
-            if records.len() >= records_per_thread {
-                store_hashes::flush_to_disk(&records, &output_file);
-                records.clear();
-            }
             records.push(record);
-        });
+
+            if records.len() * RECORD_SIZE >= thread_memory_limit {
+                
+            }
+        })
+        // .for_each(|(prefix, record)| {
+        //     let mut records = map.entry(prefix).or_insert_with(Vec::new);
+        //     if records.len() >= records_per_thread {
+        //         store_hashes::flush_to_disk(&records, &output_file);
+        //         records.clear();
+        //     }
+        //     records.push(record);
+        // });
 
     // Flush remaining records in the map
     for (prefix, records) in map {
@@ -173,7 +186,7 @@ fn main() {
             &map,
             &output_file,
             memory_limit_bytes,
-            record_size,
+            RECORD_SIZE,
         );
     }
 
