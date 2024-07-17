@@ -151,7 +151,8 @@ fn main() {
         total_generated += thread_memory_limit * num_threads;
         map.clear();
     }
-
+    // println!("Offsets vector: {:?}", offsets_vector);
+    
     // Assuming record generation and processing - og version
     // (0..num_records)
     //     .into_par_iter()
@@ -165,7 +166,6 @@ fn main() {
     //         records.push(record);
     //     });
 
-
     // if an output file is specified by the command line, it will write to that file
     // if !output_file.is_empty() {
     //     let _ = store_hashes::store_hashes_optimized(
@@ -175,9 +175,6 @@ fn main() {
     //         RECORD_SIZE,
     //     );
     // }
-
-    // let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-    // println!("Writing hashes to disk took {:?}", store_output_duration);
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
@@ -191,10 +188,6 @@ fn main() {
         "Length of the offsets vector: {}",
         offsets_vector_read.len()
     );
-
-    // for (index, offset) in offsets_vector_read.iter().enumerate() {
-    //     println!("Offset[{}]: {}", index, offset);
-    // }
 
     if num_records_to_print != 0 {
         match print_records::print_records_from_file(num_records_to_print) {

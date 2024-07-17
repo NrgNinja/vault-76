@@ -84,13 +84,16 @@ const RECORD_SIZE: usize = 32; // 32 bytes
 //     Ok(offsets)
 // }
 
-
-pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str, offsets: &RwLock<Vec<usize>>) -> io::Result<()> {
+pub fn flush_to_disk(
+    records: &DashMap<usize, Vec<Record>>,
+    filename: &str,
+    offsets: &RwLock<Vec<usize>>,
+) -> io::Result<()> {
     let path: PathBuf = PathBuf::from("./../../output").join(filename);
     let file = OpenOptions::new()
         .write(true)
         .create(true)
-        .append(false) // Not appending, as we need precise control over where we write
+        .append(true) // Not appending, as we need precise control over where we write
         .open(path)?;
 
     let mut writer = BufWriter::new(&file);
@@ -103,9 +106,12 @@ pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str, offs
         writer.seek(SeekFrom::Start(offset as u64))?; // Move to the correct position in the file
 
         for record in records {
+            // println!("Writing record: {:?} with prefix: {}", record, prefix);
+            // println!("Offsets vector before changing: {:?}", offsets[*prefix]);
             writer.write_all(&record.nonce)?;
             writer.write_all(&record.hash)?;
             offsets[*prefix] += RECORD_SIZE; // Update offset after writing
+            // println!("Offsets vector: {:?}", offsets[*prefix]);
         }
     }
     writer.flush()?;
