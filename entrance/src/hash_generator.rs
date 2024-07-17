@@ -1,9 +1,7 @@
 // // this file stores the hash generation process of the vault
-use crate::Record;
+use crate::{Record, HASH_SIZE};
 use blake3::Hasher;
 use std::convert::TryInto;
-
-const HASH_SIZE: usize = 26;
 
 // this method uses prefix extraction & returns the hash with its prefix for storage in DashMap
 #[inline]

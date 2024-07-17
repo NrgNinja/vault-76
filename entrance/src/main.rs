@@ -12,15 +12,15 @@ mod hash_generator;
 mod print_records;
 mod store_hashes;
 
-#[allow(dead_code)]
-#[derive(Debug, Serialize, Deserialize)]
-
-struct Record {
-    nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
-    hash: [u8; 26],
-}
-
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
+const HASH_SIZE: usize = 26;
+const NONCE_SIZE: usize = 6;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Record {
+    nonce: [u8; NONCE_SIZE], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
+    hash: [u8; HASH_SIZE],
+}
 
 fn main() {
     // defines letters for arguments that the user can call from command line
@@ -127,6 +127,8 @@ fn main() {
     let mut total_generated = 0;
 
     let num_buckets = 1 << (prefix_length * 8); // Calculate number of buckets
+    let records_in_bucket = num_records / num_buckets as u64;
+
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(vec![0; num_buckets]);
 
     while total_generated < total_memory {
@@ -136,14 +138,24 @@ fn main() {
                 .try_into()
                 .unwrap();
 
-            while local_size < std::cmp::min(thread_memory_limit, total_memory) {
+            while local_size < thread_memory_limit {
                 let (prefix, record) = generate_hash(nonce, prefix_length);
 
-                local_size += RECORD_SIZE;
                 nonce += 1;
 
                 let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
+
+                if records.len() >= records_in_bucket as usize {
+                    continue;
+                }
                 records.push(record);
+                local_size += RECORD_SIZE;
+
+                // println!(
+                //     "Records generated for prefix {}: {:?}",
+                //     prefix,
+                //     records.len()
+                // );
             }
         });
 
@@ -151,8 +163,9 @@ fn main() {
         total_generated += thread_memory_limit * num_threads;
         map.clear();
     }
+
     // println!("Offsets vector: {:?}", offsets_vector);
-    
+
     // Assuming record generation and processing - og version
     // (0..num_records)
     //     .into_par_iter()
