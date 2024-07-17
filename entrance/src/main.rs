@@ -4,7 +4,6 @@ use dashmap::DashMap;
 use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::os::unix::thread;
 use std::sync::RwLock;
 use std::time::Instant;
 use store_hashes::flush_to_disk;
@@ -92,15 +91,9 @@ fn main() {
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
-    let mut output_file = matches.value_of("filename").unwrap_or("");
+    let output_file = matches.value_of("filename").unwrap_or("");
 
-    let sorting_on = matches
-        .value_of("sorting_on")
-        .unwrap_or("true")
-        .parse::<bool>()
-        .expect("Please provide a valid value for sorting_on (true/false)");
-
-    let mut memory_limit = matches
+    let memory_limit = matches
         .value_of("memory_limit")
         .unwrap_or("2147483648")
         .parse::<usize>()
@@ -135,8 +128,6 @@ fn main() {
 
     let num_buckets = 1 << (prefix_length * 8); // Calculate number of buckets
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(vec![0; num_buckets]);
-
-    let generation_start: Instant = Instant::now();
 
     while total_generated < total_memory {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
@@ -174,18 +165,6 @@ fn main() {
     //         records.push(record);
     //     });
 
-    // Flush remaining records in the map
-    // for (prefix, records) in map {
-    //     store_hashes::flush_to_disk(&records, &output_file);
-    // }
-
-    let generation_duration = generation_start.elapsed();
-    // println!(
-    //     "Hash generation & storing into DashMap took {:?}",
-    //     generation_duration
-    // );
-
-    let storage_start = Instant::now();
 
     // if an output file is specified by the command line, it will write to that file
     // if !output_file.is_empty() {
@@ -202,9 +181,6 @@ fn main() {
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
-    if sorting_on {
-        print!(", sorted");
-    }
     if !output_file.is_empty() {
         print!(", stored");
     }
