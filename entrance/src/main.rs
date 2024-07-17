@@ -1,11 +1,15 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
+use dashmap::DashMap;
+use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::os::unix::thread;
+use std::sync::RwLock;
 use std::time::Instant;
+use store_hashes::flush_to_disk;
 
 mod hash_generator;
-mod hash_sorter;
 mod print_records;
 mod store_hashes;
 
@@ -16,6 +20,8 @@ struct Record {
     nonce: [u8; 6], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
     hash: [u8; 26],
 }
+
+const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 
 fn main() {
     // defines letters for arguments that the user can call from command line
@@ -58,6 +64,12 @@ fn main() {
                 .default_value("1") 
                 .help("Number of threads to use for hash generation"),
         )
+        .arg(Arg::with_name("memory_limit")
+        .short('m')
+        .long("memory_limit")
+        .takes_value(true)
+        .help("Limit memory"),)
+        .arg(Arg::with_name("prefix_length").short('x').long("prefix").takes_value(true).help("Specify the prefix length to extract from the hash"))
         .get_matches();
 
     let k = matches
@@ -80,7 +92,7 @@ fn main() {
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
-    let output_file = matches.value_of("filename").unwrap_or("");
+    let mut output_file = matches.value_of("filename").unwrap_or("");
 
     let sorting_on = matches
         .value_of("sorting_on")
@@ -88,47 +100,105 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid value for sorting_on (true/false)");
 
+    let mut memory_limit = matches
+        .value_of("memory_limit")
+        .unwrap_or("2147483648")
+        .parse::<usize>()
+        .expect("Please provide a valid number for memory_limit");
+
+    let prefix_length = matches
+        .value_of("prefix_length")
+        .unwrap_or("2")
+        .parse::<usize>()
+        .expect("Please provide a valid number for prefix_length");
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
         .unwrap();
 
-    let start_vault_timer: Instant = Instant::now();
-    let start_hash_gen_timer: Instant = Instant::now();
+    let start_vault_timer = Instant::now();
 
-    // generate hashes in parallel (if using multiple threads)
-    let mut hashes: Vec<Record> = (0..num_records)
-        .into_par_iter()
-        .map(hash_generator::generate_hash) // Now directly maps each nonce to a Record
-        .collect();
+    let total_memory: usize = (num_records * RECORD_SIZE as u64).try_into().unwrap(); // in bytes
+    let dashmap_capacity = memory_limit / RECORD_SIZE;
 
-    let hash_gen_duration = start_hash_gen_timer.elapsed();
-    println!(
-        "Generating {} hashes took {:?}",
-        num_records, hash_gen_duration
-    );
+    let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
+    let thread_memory_limit; // in bytes
 
-    let sorting_timer: Instant = Instant::now();
+    if total_memory < memory_limit {
+        thread_memory_limit = total_memory / num_threads;
+    } else {
+        thread_memory_limit = memory_limit / num_threads; // in bytes
+    }
+    let mut total_generated = 0;
 
-    if sorting_on {
-        hash_sorter::sort_hashes(&mut hashes);
+    let num_buckets = 1 << (prefix_length * 8); // Calculate number of buckets
+    let offsets_vector: RwLock<Vec<usize>> = RwLock::new(vec![0; num_buckets]);
+
+    let generation_start: Instant = Instant::now();
+
+    while total_generated < total_memory {
+        (0..num_threads).into_par_iter().for_each(|thread_index| {
+            let mut local_size = 0;
+            let mut nonce: u64 = (thread_index * (thread_memory_limit / RECORD_SIZE))
+                .try_into()
+                .unwrap();
+
+            while local_size < std::cmp::min(thread_memory_limit, total_memory) {
+                let (prefix, record) = generate_hash(nonce, prefix_length);
+
+                local_size += RECORD_SIZE;
+                nonce += 1;
+
+                let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
+                records.push(record);
+            }
+        });
+
+        flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
+        total_generated += thread_memory_limit * num_threads;
+        map.clear();
     }
 
-    let start_store_output_timer: Instant = Instant::now();
+    // Assuming record generation and processing - og version
+    // (0..num_records)
+    //     .into_par_iter()
+    //     .map(|nonce| hash_generator::generate_hash(nonce, prefix_length))
+    //     .for_each(|(prefix, record)| {
+    //         let mut records = map.entry(prefix).or_insert_with(Vec::new);
+    //         if records.len() >= records_per_thread {
+    //             store_hashes::flush_to_disk(&records, &output_file);
+    //             records.clear();
+    //         }
+    //         records.push(record);
+    //     });
 
-    let sorting_finished = sorting_timer.elapsed();
-    println!("Sorting them sequentially takes {:?}", sorting_finished);
+    // Flush remaining records in the map
+    // for (prefix, records) in map {
+    //     store_hashes::flush_to_disk(&records, &output_file);
+    // }
 
-    if output_file != "" {
-        match store_hashes::store_hashes(&hashes, output_file, &num_threads) {
-            Ok(_) => println!("Hashes successfully written to {}", output_file),
-            Err(e) => eprintln!("Error writing hashes to file: {}", e),
-        }
-    }
+    let generation_duration = generation_start.elapsed();
+    // println!(
+    //     "Hash generation & storing into DashMap took {:?}",
+    //     generation_duration
+    // );
 
-    let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
-    println!("Writing hashes to disk took {:?}", store_output_duration);
+    let storage_start = Instant::now();
+
+    // if an output file is specified by the command line, it will write to that file
+    // if !output_file.is_empty() {
+    //     let _ = store_hashes::store_hashes_optimized(
+    //         &map,
+    //         &output_file,
+    //         memory_limit_bytes,
+    //         RECORD_SIZE,
+    //     );
+    // }
+
+    // let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
+    // println!("Writing hashes to disk took {:?}", store_output_duration);
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
@@ -140,8 +210,18 @@ fn main() {
     }
     println!(" {} records in {:?}", num_records, duration);
 
+    let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
+    println!(
+        "Length of the offsets vector: {}",
+        offsets_vector_read.len()
+    );
+
+    // for (index, offset) in offsets_vector_read.iter().enumerate() {
+    //     println!("Offset[{}]: {}", index, offset);
+    // }
+
     if num_records_to_print != 0 {
-        match print_records::print_records(output_file, num_records_to_print) {
+        match print_records::print_records_from_file(num_records_to_print) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
             Err(e) => eprintln!("Error deserializing hashes: {}", e),
         }

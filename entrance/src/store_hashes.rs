@@ -1,179 +1,114 @@
-// Writes data to disk sequentially
-
-// use rayon::iter::{IntoParallelIterator, ParallelIterator};
-// use std::fs::File;
-// use std::io::{self, BufWriter, Write};
-
-// use crate::Record;
-
-// // Serializes records into binary and stores them in a file on disk
-// pub fn store_hashes(records: &Vec<Record>, filename: &str) -> io::Result<()> {
-//     let file = File::create(filename)?;
-//     let mut writer = BufWriter::new(file);
-
-//     // Specify chunk size and splits records into chunks
-//     let chunk_size = 2097152;
-//     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
-
-//     // Process chunks in parallel
-//     let results: Vec<Vec<u8>> = record_chunks
-//         .into_par_iter()
-//         .map(|chunk| {
-//             let mut buffer = Vec::with_capacity(chunk.len() * (32)); // pre-allocate buffer space
-
-//             for record in chunk {
-//                 buffer.extend_from_slice(&record.nonce);
-//                 buffer.extend_from_slice(&record.hash);
-//             }
-
-//             buffer
-//         })
-//         .collect(); // collect all results from parallel processing into a vector
-
-//     // Write results sequentially
-//     for buffer in results {
-//         writer.write_all(&buffer)?; // write buffer contents into the file
-//     }
-
-//     // Flush the writer to ensure all buffered data is written to disk
-//     writer.flush()?;
-
-//     Ok(())
-// }
-
-// Uses mutex and locks
-
-// use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-// use std::fs::File;
-// use std::io::{self, BufWriter, Seek, Write};
-// use std::sync::Mutex;
-
-// use crate::Record;
-
-// // Serializes records into binary and stores them in a file on disk
-// pub fn store_hashes(records: &[Record], filename: &str) -> io::Result<()> {
-//     let file = File::create(filename)?;
-//     let file = Mutex::new(file); // Use a Mutex to synchronize access to the file
-
-//     // Specify chunk size and split records into chunks
-//     let chunk_size = 268435456;
-//     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
-
-//     // Process chunks in parallel
-//     record_chunks
-//         .into_par_iter()
-//         .enumerate()
-//         .try_for_each::<_, io::Result<()>>(|(thread_num, chunk)| {
-//             let mut buffer = Vec::with_capacity(chunk.len() * 32); // Pre-allocate buffer space
-
-//             for record in chunk {
-//                 buffer.extend_from_slice(&record.nonce);
-//                 buffer.extend_from_slice(&record.hash);
-//             }
-
-//             let start_pos = (chunk_size * thread_num) as u64;
-//             let mut local_file = file.lock().unwrap(); // Lock the file for writing
-//             local_file.seek(io::SeekFrom::Start(start_pos))?;
-
-//             local_file.write_all(&buffer)?;
-//             Ok(())
-//         })?;
-
-//     Ok(())
-// }
-
-// Writes data to disk concurrently and uses BufWriter
-// use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-// use std::fs::File;
-// use std::io::{self, BufWriter, Seek, SeekFrom, Write};
-
-// use crate::Record;
-
-// // Serializes records into binary and stores them in a file on disk
-// pub fn store_hashes(records: &[Record], filename: &str) -> io::Result<()> {
-//     let file = File::create(filename)?;
-
-//     // Calculate the size of each record
-//     let record_size = std::mem::size_of::<Record>();
-
-//     // Specify chunk size and split records into chunks
-//     let chunk_size = 268435456;
-//     let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
-
-//     // Process chunks in parallel
-//     record_chunks
-//         .into_par_iter()
-//         .enumerate()
-//         .try_for_each::<_, io::Result<()>>(|(num_thread, chunk)| {
-//             let mut buffer = Vec::with_capacity(chunk.len() * record_size); // Pre-allocate buffer space
-
-//             for record in chunk {
-//                 buffer.extend_from_slice(&record.nonce);
-//                 buffer.extend_from_slice(&record.hash);
-//             }
-
-//             // Calculate the start position for this chunk
-//             let start_pos = (num_thread * chunk_size) as u64;
-
-//             // Clone the file to create a new BufWriter for each thread
-//             let local_file = file.try_clone()?;
-//             let mut local_writer = BufWriter::new(local_file);
-
-//             // Seek to the correct position and write the buffer
-//             local_writer.seek(SeekFrom::Start(start_pos))?;
-//             local_writer.write_all(&buffer)?;
-//             local_writer.flush()?;
-
-//             Ok(())
-//         })?;
-
-//     Ok(())
-// }
-
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use std::fs::File;
-use std::io::{self, BufWriter, Seek, SeekFrom, Write};
-use std::sync::Arc;
-
+// this file writes the hashes to disk using multiple threads
 use crate::Record;
+use dashmap::DashMap;
+// use heapless::Vec as HeaplessVec;
+// use rayon::prelude::*;
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+use std::path::PathBuf;
+use std::sync::RwLock;
+// use std::time::Instant;
+// use std::fs::File;
 
-// Serializes records into binary and stores them in a file on disk
-pub fn store_hashes(records: &[Record], filename: &str, num_threads: &usize) -> io::Result<()> {
-    let file = Arc::new(File::create(filename)?);
+// const BUFFER_SIZE: usize = 128 * 1024; // 128 KB
+const RECORD_SIZE: usize = 32; // 32 bytes
 
-    // Calculate the size of each record
-    let record_size = std::mem::size_of::<Record>();
+// // multi-threaded approach where threads write to different parts of the file
+// pub fn store_hashes_optimized(
+//     map: &DashMap<u64, Vec<Record>>,
+//     filename: &str,
+//     memory_limit_bytes: usize,
+//     record_size: usize,
+// ) -> io::Result<()> {
+//     let path = PathBuf::from("./../../output").join(filename);
+//     let keys_and_offsets = prepare_offsets(&map)?;
 
-    // Specify chunk size and split records into chunks
-    let chunk_size = (records.len() / num_threads) * 32;
-    let record_chunks: Vec<&[Record]> = records.chunks(chunk_size).collect();
+//     keys_and_offsets
+//         .into_par_iter()
+//         .try_for_each(|(key, offset, _length)| {
+//             if let Some(records) = map.get(&key) {
+//                 let mut local_file = OpenOptions::new().write(true).open(&path)?;
+//                 local_file.seek(SeekFrom::Start(offset as u64))?;
+//                 let mut local_writer = BufWriter::with_capacity(BUFFER_SIZE, &local_file);
 
-    // Process chunks in parallel
-    record_chunks
-        .into_par_iter()
-        .enumerate()
-        .try_for_each::<_, io::Result<()>>(|(chunk_idx, chunk)| {
-            let mut buffer = Vec::with_capacity(chunk.len() * record_size); // Pre-allocate buffer space
+//                 let chunks = records.value().chunks(memory_limit_bytes / record_size);
+//                 for chunk in chunks {
+//                     for record in chunk {
+//                         let encoded = serialize_record(record)?;
+//                         local_writer.write_all(&encoded)?;
+//                     }
+//                 }
+//                 local_writer.flush()?;
+//             }
+//             Ok::<(), io::Error>(())
+//         })?;
 
-            for record in chunk {
-                buffer.extend_from_slice(&record.nonce);
-                buffer.extend_from_slice(&record.hash);
-            }
+//     Ok(())
+// }
 
-            let start_pos = (chunk_idx * chunk_size) as u64;
+// // function to calculate the total size of the file by counting each record in the DashMap
+// pub fn calculate_total_size(map: &DashMap<u64, Vec<Record>>) -> u64 {
+//     map.iter()
+//         .map(|entry| entry.value().len() as u64 * 32)
+//         .sum()
+// }
 
-            let local_file = file.clone();
-            std::thread::spawn(move || {
-                let mut local_writer = BufWriter::new(&*local_file);
-                local_writer.seek(SeekFrom::Start(start_pos)).unwrap();
-                local_writer.write_all(&buffer).unwrap();
-                local_writer.flush().unwrap();
-            })
-            .join()
-            .unwrap();
+// // function to prepare the offsets for each key in the DashMap
+// pub fn prepare_offsets(map: &DashMap<u64, Vec<Record>>) -> io::Result<Vec<(u64, usize, usize)>> {
+//     let mut keys: Vec<u64> = map.iter().map(|entry| *entry.key()).collect();
+//     keys.par_sort_unstable(); // sort keys in parallel
 
-            Ok(())
-        })?;
+//     // let path = PathBuf::from("output").join("metadata.bin");
+//     // use the one below when you want to cargo run from the benchmark folder
+//     let path = PathBuf::from("./../../output").join("metadata.bin");
 
+//     let metadata_file = OpenOptions::new().write(true).create(true).open(path)?;
+//     let mut metadata_writer = BufWriter::new(metadata_file);
+
+//     let mut offsets = Vec::new();
+//     let mut cumulative_offset = 0;
+
+//     for key in keys {
+//         if let Some(records) = map.get(&key) {
+//             let size = records.len() * 32; // each record is 32 bytes
+//             offsets.push((key, cumulative_offset, size));
+
+//             // serialize and write the metadata for each key, logging the start of this section
+//             let metadata = format!("{},{},{}\n", key, cumulative_offset, size);
+//             metadata_writer.write_all(metadata.as_bytes())?;
+
+//             cumulative_offset += size;
+//         }
+//     }
+//     metadata_writer.flush()?;
+//     Ok(offsets)
+// }
+
+
+pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str, offsets: &RwLock<Vec<usize>>) -> io::Result<()> {
+    let path: PathBuf = PathBuf::from("./../../output").join(filename);
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(false) // Not appending, as we need precise control over where we write
+        .open(path)?;
+
+    let mut writer = BufWriter::new(&file);
+
+    for entry in records.iter() {
+        let (prefix, records) = entry.pair();
+        let mut offsets = offsets.write().unwrap(); // Acquire write lock on offsets
+        let offset = offsets[*prefix]; // Get current offset for this bucket
+
+        writer.seek(SeekFrom::Start(offset as u64))?; // Move to the correct position in the file
+
+        for record in records {
+            writer.write_all(&record.nonce)?;
+            writer.write_all(&record.hash)?;
+            offsets[*prefix] += RECORD_SIZE; // Update offset after writing
+        }
+    }
+    writer.flush()?;
+    file.sync_all()?;
     Ok(())
 }

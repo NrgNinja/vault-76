@@ -2,4 +2,6 @@ entrance/target/release/
 entrance/target/debug/
 entrance/target/
 Cargo.lock
-output.bin
+entrance/output/*
+entrance/stats/*
+.DS_Store
