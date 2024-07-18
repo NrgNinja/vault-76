@@ -93,7 +93,6 @@ pub fn flush_to_disk(
     let file = OpenOptions::new()
         .write(true)
         .create(true)
-        .append(true) // Not appending, as we need precise control over where we write
         .open(path)?;
 
     let mut writer = BufWriter::new(&file);

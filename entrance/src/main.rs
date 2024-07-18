@@ -34,13 +34,13 @@ fn main() {
                 .takes_value(true) // there must be a number inputted
                 .help("Specify k value to compute 2^k nonces"),
         )
-        .arg(
-            Arg::with_name("filename")
-                .short('f')
-                .long("filename")
-                .takes_value(true)
-                .help("Output file to store the generated hashes"),
-        )
+        // .arg(
+        //     Arg::with_name("filename")
+        //         .short('f')
+        //         .long("filename")
+        //         .takes_value(true)
+        //         .help("Output file to store the generated hashes"),
+        // )
         .arg(
             Arg::with_name("print")
                 .short('p')
@@ -63,12 +63,24 @@ fn main() {
                 .default_value("1") 
                 .help("Number of threads to use for hash generation"),
         )
-        .arg(Arg::with_name("memory_limit")
-        .short('m')
-        .long("memory_limit")
-        .takes_value(true)
-        .help("Limit memory"),)
-        .arg(Arg::with_name("prefix_length").short('x').long("prefix").takes_value(true).help("Specify the prefix length to extract from the hash"))
+        .arg(
+            Arg::with_name("file_size")
+                .short('f')
+                .long("file_size")
+                .takes_value(true)
+                .help("File size to be populated with hashes"))
+        .arg(
+            Arg::with_name("memory_limit")
+                .short('m')
+                .long("memory_limit")
+                .takes_value(true)
+                .help("Limit memory"),)
+        .arg(
+            Arg::with_name("prefix_length")
+                .short('x')
+                .long("prefix")
+                .takes_value(true)
+                .help("Specify the prefix length to extract from the hash"))
         .get_matches();
 
     let k = matches
@@ -77,7 +89,7 @@ fn main() {
         .parse::<u32>()
         .expect("Please provide a valid integer for k");
 
-    let num_records = 2u64.pow(k);
+    let num_records = 2u64.pow(k) as usize;
 
     let num_threads = matches
         .value_of("threads")
@@ -91,8 +103,6 @@ fn main() {
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
-    let output_file = matches.value_of("filename").unwrap_or("");
-
     let memory_limit = matches
         .value_of("memory_limit")
         .unwrap_or("2147483648")
@@ -105,6 +115,14 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for prefix_length");
 
+    let file_size = matches
+        .value_of("file_size")
+        .unwrap_or("0")
+        .parse::<usize>()
+        .expect("Please provide a valid number for file_size");
+
+    let output_file = "output.bin";
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
@@ -113,7 +131,7 @@ fn main() {
 
     let start_vault_timer = Instant::now();
 
-    let total_memory: usize = (num_records * RECORD_SIZE as u64).try_into().unwrap(); // in bytes
+    let total_memory: usize = (num_records * RECORD_SIZE).try_into().unwrap(); // in bytes
     let dashmap_capacity = memory_limit / RECORD_SIZE;
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(dashmap_capacity);
@@ -126,10 +144,24 @@ fn main() {
     }
     let mut total_generated = 0;
 
-    let num_buckets = 1 << (prefix_length * 8); // Calculate number of buckets
-    let records_in_bucket = num_records / num_buckets as u64;
+    let num_buckets: usize = 1 << (prefix_length * 8); // Calculate number of buckets
+    let records_in_bucket = num_records / num_buckets;
 
-    let offsets_vector: RwLock<Vec<usize>> = RwLock::new(vec![0; num_buckets]);
+    let memory_bucket_size = records_in_bucket * RECORD_SIZE;
+    let disk_bucket_size = memory_bucket_size * (total_memory / memory_limit) - 1;
+
+    // println!("Disk bucket size: {}", disk_bucket_size);
+    // println!("{}, {}, {}", records_in_bucket, total_memory/memory_limit, memory_limit);
+
+    let mut offsets = vec![0; num_buckets];
+
+    for i in 1..num_buckets {
+        offsets[i] = offsets[i - 1] + disk_bucket_size;
+    }
+
+    let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
+
+    println!("Offset vector: {:?}", offsets_vector);
 
     while total_generated < total_memory {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
