@@ -16,7 +16,7 @@ free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_cac
 # sar -r 1 >stats/memory/memory-stats_$k$threads.txt &
 sleep 5
 
-./../../target/release/entrance -k $k -t $threads -f output.bin
+./../../target/release/entrance -k $k -t $threads
 # dd if=/dev/urandom of=newfile bs=1M count=1024
 # shred -s 1000000000 - >my-file
 sleep 5
