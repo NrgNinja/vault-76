@@ -1,13 +1,11 @@
 // this file holds the main driver of our vault codebase
 use clap::{App, Arg};
 use dashmap::DashMap;
-use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::f64;
 use std::sync::RwLock;
 use std::time::Instant;
-use store_hashes::flush_to_disk;
 
 mod hash_generator;
 mod print_records;
@@ -217,7 +215,7 @@ fn main() {
                 .unwrap();
 
             while local_size < thread_memory_limit {
-                let (prefix, record) = generate_hash(nonce, prefix_size);
+                let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size);
 
                 nonce += 1;
 
@@ -237,7 +235,7 @@ fn main() {
             }
         });
 
-        flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
+        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
     }
