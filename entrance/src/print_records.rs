@@ -32,7 +32,6 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
             Ok(record) => {
                 let nonce_decimal = nonce_to_decimal(&record.nonce);
-
                 // to print hashes in binary format instead of hex:
                 // let hash_binary = &record
                 //     .hash
@@ -41,7 +40,24 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
                 //     .collect::<Vec<String>>()
                 //     .join("");
                 let hash_hex = hash_to_string(&record.hash);
-                println!("{:<16} | {}", nonce_decimal, hash_hex);
+
+                let mut prefix = 0u64;
+                let mut bits_processed = 0;
+
+                for &byte in &record.hash {
+                    let bits_to_take = (6 - bits_processed).min(8); // calculates the number of bits to take from the current hash byte (goal is to take the entire prefix_length, but we cannot take more than 8 bits at a time = 1 byte)
+                    prefix <<= bits_to_take; // shift current prefix value to the left by bits_to_take bits
+                    prefix |= (byte >> (8 - bits_to_take)) as u64;
+                    bits_processed += bits_to_take;
+
+                    if bits_processed >= 6 {
+                        break;
+                    }
+                }
+
+                prefix &= (1u64 << 6) - 1;
+
+               println!("{:<16} | {} | {}", nonce_decimal, hash_hex, prefix);
                 counter += 1;
             }
             Err(_) => break,
@@ -58,6 +74,8 @@ pub fn verify_records_sorted() -> io::Result<()> {
     let mut last_hash = vec![0u8; HASH_SIZE]; // Initially the smallest possible hash
     let mut is_first = true;
 
+    println!("Last hash: {:?}", last_hash);
+
     loop {
         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
             Ok(record) => {
@@ -68,7 +86,9 @@ pub fn verify_records_sorted() -> io::Result<()> {
                     if last_hash > record.hash.to_vec() {
                         return Err(io::Error::new(
                             io::ErrorKind::Other,
-                            "output.bin doesn't seem to be sorted correctly",
+                            format!(
+                                "output.bin doesn't seem to be sorted correctly with hashes",
+                            ),
                         ));
                     }
                     last_hash = record.hash.to_vec();

@@ -3,7 +3,7 @@ use crate::{Record, RECORD_SIZE};
 use dashmap::DashMap;
 // use rayon::prelude::*;
 use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::RwLock;
 
@@ -63,6 +63,9 @@ pub fn flush_to_disk(
         let (prefix, records) = entry.pair();
         // let mut offsets = offsets.write().unwrap(); // Acquire write lock on offsets
         let offset = offsets[*prefix]; // Get current offset for this bucket
+        // println!("Writing records for prefix: {} with offset: {}", prefix, offset);
+
+        writer.seek(SeekFrom::Start(offset as u64))?; // Seek to the start of the bucket
 
         // Write all records for this bucket
         for record in records {
