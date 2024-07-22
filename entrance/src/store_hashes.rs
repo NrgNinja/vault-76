@@ -84,29 +84,59 @@ const RECORD_SIZE: usize = 32; // 32 bytes
 //     Ok(offsets)
 // }
 
+// pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str, offsets: &RwLock<Vec<usize>>) -> io::Result<()> {
+//     let path: PathBuf = PathBuf::from("./../../output").join(filename);
+//     let file = OpenOptions::new()
+//         .write(true)
+//         .create(true)
+//         .append(false) // Not appending, as we need precise control over where we write
+//         .open(path)?;
 
-pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>, filename: &str, offsets: &RwLock<Vec<usize>>) -> io::Result<()> {
+//     let mut writer = BufWriter::new(&file);
+
+//     for entry in records.iter() {
+//         let (prefix, records) = entry.pair();
+//         let mut offsets = offsets.write().unwrap(); // Acquire write lock on offsets
+//         let offset = offsets[*prefix]; // Get current offset for this bucket
+
+//         writer.seek(SeekFrom::Start(offset as u64))?; // Move to the correct position in the file
+
+//         for record in records {
+//             writer.write_all(&record.nonce)?;
+//             writer.write_all(&record.hash)?;
+//             offsets[*prefix] += RECORD_SIZE; // Update offset after writing
+//         }
+//     }
+//     writer.flush()?;
+//     file.sync_all()?;
+//     Ok(())
+// }
+
+pub fn flush_to_disk(records: &DashMap<usize, Vec<Record>>,filename: &str,offsets: &RwLock<Vec<usize>>,) -> io::Result<()> {
     let path: PathBuf = PathBuf::from("./../../output").join(filename);
     let file = OpenOptions::new()
         .write(true)
         .create(true)
-        .append(false) // Not appending, as we need precise control over where we write
+        .truncate(true) // Start fresh, or handle the file opening according to your needs
         .open(path)?;
 
     let mut writer = BufWriter::new(&file);
 
+    // Lock the offsets vector for updating
+    let mut offsets = offsets.write().unwrap();
+
     for entry in records.iter() {
         let (prefix, records) = entry.pair();
-        let mut offsets = offsets.write().unwrap(); // Acquire write lock on offsets
-        let offset = offsets[*prefix]; // Get current offset for this bucket
+        let offset = offsets[*prefix]; // Current offset for this bucket
+        writer.seek(SeekFrom::Start(offset as u64))?; // Position the writer
 
-        writer.seek(SeekFrom::Start(offset as u64))?; // Move to the correct position in the file
-
+        // Write all records for this bucket
         for record in records {
             writer.write_all(&record.nonce)?;
             writer.write_all(&record.hash)?;
-            offsets[*prefix] += RECORD_SIZE; // Update offset after writing
         }
+        // Update the offset for this bucket after writing all records
+        offsets[*prefix] = offset + records.len() * RECORD_SIZE; // Increment by the number of bytes written
     }
     writer.flush()?;
     file.sync_all()?;

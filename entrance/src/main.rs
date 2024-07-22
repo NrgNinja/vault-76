@@ -1,15 +1,18 @@
 // this file holds the main driver of our vault codebase
+use crate::progress_tracker::ProgressTracker;
 use clap::{App, Arg};
 use dashmap::DashMap;
 use hash_generator::generate_hash;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use spdlog::prelude::*;
 use std::sync::RwLock;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use store_hashes::flush_to_disk;
 
 mod hash_generator;
 mod print_records;
+mod progress_tracker;
 mod store_hashes;
 
 #[allow(dead_code)]
@@ -111,6 +114,11 @@ fn main() {
         .build_global()
         .unwrap();
 
+    info!("Opening Vault Entrance...");
+
+    // let mut tracker = ProgressTracker::new(num_records, Duration::from_secs(1));
+    let mut tracker = ProgressTracker::new(num_records, Duration::from_secs(1));
+
     let start_vault_timer = Instant::now();
 
     let total_memory: usize = (num_records * RECORD_SIZE as u64).try_into().unwrap(); // in bytes
@@ -129,6 +137,7 @@ fn main() {
     let num_buckets = 1 << (prefix_length * 8); // Calculate number of buckets
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(vec![0; num_buckets]);
 
+    tracker.set_stage("Generation");
     while total_generated < total_memory {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
             let mut local_size = 0;
@@ -145,11 +154,15 @@ fn main() {
                 let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
                 records.push(record);
             }
+            // completed a batch of records processed
+            // tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
         });
 
+        tracker.set_stage("Storing");
         flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
+        tracker.log_progress_if_needed(); // Ensure that progress is logged after a flush
     }
 
     // Assuming record generation and processing - og version
@@ -165,7 +178,6 @@ fn main() {
     //         records.push(record);
     //     });
 
-
     // if an output file is specified by the command line, it will write to that file
     // if !output_file.is_empty() {
     //     let _ = store_hashes::store_hashes_optimized(
@@ -179,18 +191,22 @@ fn main() {
     // let store_output_duration: std::time::Duration = start_store_output_timer.elapsed();
     // println!("Writing hashes to disk took {:?}", store_output_duration);
 
+    // Final log to mark completion
+    tracker.set_stage("Completed");
+    tracker.update_records_processed(num_records - tracker.get_records_processed());
+
     let duration = start_vault_timer.elapsed();
     print!("Generated");
     if !output_file.is_empty() {
-        print!(", stored");
+        print!(" & stored");
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
-    println!(
-        "Length of the offsets vector: {}",
-        offsets_vector_read.len()
-    );
+    // let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
+    // println!(
+    //     "Length of the offsets vector: {}",
+    //     offsets_vector_read.len()
+    // );
 
     // for (index, offset) in offsets_vector_read.iter().enumerate() {
     //     println!("Offset[{}]: {}", index, offset);

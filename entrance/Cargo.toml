@@ -19,6 +19,7 @@ indicatif = "0.17.8"
 libc = "0.2.155"
 postcard = { version = "1.0.8", features = ["use-std"] }
 heapless = "=0.7.17"
+spdlog-rs = "0.3"
 
 [profile.release]
 debug = false
