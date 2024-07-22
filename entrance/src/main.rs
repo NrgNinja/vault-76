@@ -193,7 +193,7 @@ fn main() {
             num_records = file_size / RECORD_SIZE;
             expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
-            let sort_ratio = sort_memory / bucket_size * RECORD_SIZE;
+            let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
             sort_buckets = num_buckets / sort_ratio;
 
             println!(
@@ -247,7 +247,7 @@ fn main() {
 
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-    // println!("Offset vector: {:?}", offsets_vector);
+    // println!("Offset vector for generation: {:?}", offsets_vector);
 
     tracker.set_stage("Generation");
     while total_generated < file_size {
@@ -290,25 +290,18 @@ fn main() {
     if sorting_on {
         let start_sorting = Instant::now();
 
+        // Creating an offset vector for sorting
         let mut offsets = vec![0; sort_buckets];
-
-        println!("Offset vector 1: {:?} and sort buckets: {}", offsets, sort_buckets);
-
         for i in 1..sort_buckets{
             offsets[i] = offsets[i - 1] + sort_memory;
         }
-
-        println!("Offset vector 1 after populating it: {:?}", offsets);
-
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
-
-        println!("Offset vector 2: {:?}", offsets_vector);
 
         let path = format!("./../../output/{}", output_file);
 
         // Parallel processing of each bucket using rayon
         (0..sort_buckets).into_par_iter().for_each(|bucket_index| {
-            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
+            hash_sorter::sort_hashes(&path, bucket_index, sort_memory, &offsets_vector);
         });
 
         let sorting_duration = start_sorting.elapsed();
