@@ -291,20 +291,21 @@ fn main() {
     }
 
     if sorting_on {
+        tracker.set_stage("[SORTING]");
         let start_sorting = Instant::now();
 
         // Creating an offset vector for sorting
-        let mut offsets = vec![0; sort_buckets];
-        for i in 1..sort_buckets{
-            offsets[i] = offsets[i - 1] + sort_memory;
+        let mut offsets = vec![0; num_buckets];
+        for i in 1..num_buckets{
+            offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
         let path = format!("./../../output/{}", output_file);
 
         // Parallel processing of each bucket using rayon
-        (0..sort_buckets).into_par_iter().for_each(|bucket_index| {
-            hash_sorter::sort_hashes(&path, bucket_index, sort_memory, &offsets_vector);
+        (0..num_buckets).into_par_iter().for_each(|bucket_index| {
+            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
         });
 
         let sorting_duration = start_sorting.elapsed();
