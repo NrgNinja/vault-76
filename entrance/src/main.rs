@@ -16,6 +16,7 @@ mod hash_generator;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
+mod hash_sorter;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
@@ -129,7 +130,11 @@ fn main() {
 
     let output_file = "output.bin";
 
-    let verify = matches.is_present("verify");
+    let sorting_on = matches
+        .value_of("sorting_on")
+        .unwrap_or("true")
+        .parse::<bool>()
+        .expect("Please provide a valid boolean value for sorting_on");
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -241,7 +246,7 @@ fn main() {
     let mut offsets = vec![0; num_buckets];
 
     for i in 1..num_buckets {
-        offsets[i] = offsets[i - 1] + bucket_size * 32 + 1;
+        offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
     }
 
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
@@ -284,22 +289,24 @@ fn main() {
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
-        tracker.log_progress_if_needed(); // log progress after each flush
     }
 
-    // if an output file is specified by the command line, it will write to that file
-    // if !output_file.is_empty() {
-    //     let _ = store_hashes::store_hashes_optimized(
-    //         &map,
-    //         &output_file,
-    //         memory_limit_bytes,
-    //         RECORD_SIZE,
-    //     );
-    // }
+    if sorting_on {
+        let mut offsets = vec![0; num_buckets];
 
-    // Final log to mark completion
-    tracker.set_stage("Completed");
-    tracker.update_records_processed(num_records as u64 - tracker.get_records_processed());
+        for i in 1..num_buckets {
+            offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
+        }
+
+        let path = format!("./../../output/{}", output_file);
+
+        // Parallel processing of each bucket using rayon
+        (0..num_buckets).into_par_iter().for_each(|bucket_index| {
+            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets);
+        });
+    }
+
+    // println!("Offsets vector: {:?}", offsets_vector);
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
