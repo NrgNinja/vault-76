@@ -1,9 +1,19 @@
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::{
+    io::{BufReader, Read, Seek, SeekFrom, Write},
+    sync::RwLock,
+};
 
 use crate::{NONCE_SIZE, RECORD_SIZE};
 
-pub fn sort_hashes(path: &String, bucket_index: usize, bucket_size: usize, offsets: &[usize]) {
-    let file = std::fs::OpenOptions::new()
+pub fn sort_hashes(
+    path: &String,
+    bucket_index: usize,
+    bucket_size: usize,
+    offsets: &RwLock<Vec<usize>>,
+) {
+    let offsets = offsets.write().unwrap(); // Acquire write lock on offsets
+
+    let mut file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .open(&path)
@@ -33,13 +43,7 @@ pub fn sort_hashes(path: &String, bucket_index: usize, bucket_size: usize, offse
     }
 
     // Sort the records in the current bucket
-    bucket_records.sort_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
-
-    // Write the sorted records back to the file
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .open(&path)
-        .expect("Error opening file for writing");
+    bucket_records.sort_unstable_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
 
     file.seek(SeekFrom::Start(start))
         .expect("Error seeking to start of bucket");

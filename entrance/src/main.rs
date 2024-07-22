@@ -160,7 +160,8 @@ fn main() {
     let mut num_buckets = 0;
     let mut prefix_size = 0;
     let mut expected_total_flushes;
-    let mut sort_memory;
+    let mut sort_memory = 0;
+    let mut sort_buckets = 0;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {
@@ -186,6 +187,8 @@ fn main() {
             num_records = file_size / RECORD_SIZE;
             expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
+            let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
+            sort_buckets = num_buckets / sort_ratio;
 
             println!(
                 "Memory size: {} bytes ({} GB)",
@@ -245,7 +248,7 @@ fn main() {
 
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-    // println!("Offset vector: {:?}", offsets_vector);
+    // println!("Offset vector for generation: {:?}", offsets_vector);
 
     while total_generated < file_size {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
@@ -288,18 +291,24 @@ fn main() {
 
     if sorting_on {
         tracker.set_stage("[SORTING]");
-        let mut offsets = vec![0; num_buckets];
+        let start_sorting = Instant::now();
 
-        for i in 1..num_buckets {
+        // Creating an offset vector for sorting
+        let mut offsets = vec![0; num_buckets];
+        for i in 1..num_buckets{
             offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
         }
+        let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
         let path = format!("./../../output/{}", output_file);
 
         // Parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
-            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets);
+            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
         });
+
+        let sorting_duration = start_sorting.elapsed();
+        println!("Sorting took {:?}", sorting_duration);
     }
 
     // Final log to mark completion

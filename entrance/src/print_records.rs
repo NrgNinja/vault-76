@@ -74,8 +74,6 @@ pub fn verify_records_sorted() -> io::Result<()> {
     let mut last_hash = vec![0u8; HASH_SIZE]; // Initially the smallest possible hash
     let mut is_first = true;
 
-    println!("Last hash: {:?}", last_hash);
-
     loop {
         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
             Ok(record) => {
