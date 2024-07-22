@@ -1,5 +1,5 @@
 // this file prints records specified by the command line flag: -p
-use crate::Record;
+use crate::{Record, HASH_SIZE};
 use bincode::deserialize_from;
 use std::fs::File;
 use std::io::{self, BufReader};
@@ -10,7 +10,7 @@ fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
 }
 
 // converts hash from byte array to a hexadecimal string
-fn hash_to_string(hash: &[u8; 26]) -> String {
+fn hash_to_string(hash: &[u8; HASH_SIZE]) -> String {
     hash.iter()
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<String>>()
