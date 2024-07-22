@@ -6,13 +6,11 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use spdlog::prelude::*;
 use std::f64;
-use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
 mod hash_generator;
+mod hash_sorter;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
@@ -242,7 +240,7 @@ fn main() {
     let mut offsets = vec![0; num_buckets];
 
     for i in 1..num_buckets {
-        offsets[i] = offsets[i - 1] + bucket_size * 32 + 1;
+        offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
     }
 
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
@@ -286,18 +284,22 @@ fn main() {
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
-        // tracker.log_progress_if_needed(); // log progress after each flush
     }
 
-    // if an output file is specified by the command line, it will write to that file
-    // if !output_file.is_empty() {
-    //     let _ = store_hashes::store_hashes_optimized(
-    //         &map,
-    //         &output_file,
-    //         memory_limit_bytes,
-    //         RECORD_SIZE,
-    //     );
-    // }
+    if sorting_on {
+        let mut offsets = vec![0; num_buckets];
+
+        for i in 1..num_buckets {
+            offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
+        }
+
+        let path = format!("./../../output/{}", output_file);
+
+        // Parallel processing of each bucket using rayon
+        (0..num_buckets).into_par_iter().for_each(|bucket_index| {
+            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets);
+        });
+    }
 
     // Final log to mark completion
     tracker.set_stage("Completed");
