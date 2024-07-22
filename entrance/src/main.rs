@@ -220,7 +220,6 @@ fn main() {
         write_size /= 2;
     }
 
-    // configure_logging();
     info!("Opening Vault Entrance...");
 
     // initialize tracker to track progress of vault operations
@@ -338,14 +337,3 @@ fn main() {
         }
     }
 }
-
-// fn configure_logging() {
-//     // Initialize logger here if not already initialized
-//     let logger = spdlog::default_logger();
-
-//     // Set pattern: only display time, log level in uppercase, and the message
-//     logger.set_pattern("[%^%H:%M:%S%$] [%L] %v");
-
-//     // Apply changes to the default logger if needed
-//     spdlog::set_default_logger(logger);
-// }
