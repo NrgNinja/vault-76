@@ -78,15 +78,20 @@ impl ProgressTracker {
             total_records,
             records_processed: Arc::new(Mutex::new(0)),
             update_interval,
-            current_stage: Arc::new(Mutex::new(String::from("Initializing"))),
+            current_stage: Arc::new(Mutex::new(String::from("[START]"))),
         });
         tracker.start_progress_thread();
         tracker
     }
 
+    // pub fn update_records_processed(&self, processed: u64) {
+    //     let mut records = self.records_processed.lock().unwrap();
+    //     *records += processed;
+    // }
+
     pub fn update_records_processed(&self, processed: u64) {
         let mut records = self.records_processed.lock().unwrap();
-        *records += processed;
+        *records = (*records + processed).min(self.total_records);
     }
 
     pub fn set_stage(&self, stage: &str) {
@@ -107,16 +112,22 @@ impl ProgressTracker {
                 thread::sleep(interval);
                 let now_processed = *records.lock().unwrap();
                 let elapsed = start_time.elapsed().as_secs_f32();
-                let progress = (now_processed as f32 / total_records as f32) * 100.0;
                 let throughput = (now_processed - last_processed) as f32 / interval.as_secs_f32();
-                let eta = if now_processed > 0 {
+                // let progress = (now_processed as f32 / total_records as f32) * 100.0;
+                // let eta = if now_processed > 0 {
+                //     (elapsed / progress) * (100.0 - progress)
+                // } else {
+                //     0.0
+                // };
+                let progress = (now_processed as f32 / total_records as f32).min(1.0) * 100.0;
+                let eta = if now_processed > 0 && progress < 100.0 {
                     (elapsed / progress) * (100.0 - progress)
                 } else {
                     0.0
                 };
 
                 info!(
-                    "Stage: {}, Progress: {:.2}% complete, ETA: {:.2} seconds, Throughput: {:.2} records/sec",
+                    "Stage: {}, Progress: {:.2}% complete, ETA: {:.2} seconds, Throughput: {:.2} MB/sec",
                     *current_stage.lock().unwrap(),
                     progress,
                     eta,
