@@ -32,8 +32,14 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
             Ok(record) => {
                 let nonce_decimal = nonce_to_decimal(&record.nonce);
+                let hash_binary = &record
+                    .hash
+                    .iter()
+                    .map(|b| format!("{:08b}", b))
+                    .collect::<Vec<String>>()
+                    .join("");
                 let hash_hex = hash_to_string(&record.hash);
-                println!("{:<16} | {}", nonce_decimal, hash_hex);
+                println!("{:<16} | {}", nonce_decimal, hash_binary);
                 counter += 1;
             }
             Err(_) => break,

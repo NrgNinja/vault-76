@@ -4,6 +4,9 @@ use dashmap::DashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::f64;
+use std::fs::File;
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::Instant;
 
@@ -108,6 +111,12 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for file_size");
 
+    let sorting_on = matches
+        .value_of("sorting_on")
+        .unwrap_or("true")
+        .parse::<bool>()
+        .expect("Please provide a valid boolean for sorting_on");
+
     let output_file = "output.bin";
 
     // libary to use multiple threads
@@ -200,7 +209,7 @@ fn main() {
     let mut offsets = vec![0; num_buckets];
 
     for i in 1..num_buckets {
-        offsets[i] = offsets[i - 1] + bucket_size * 32;
+        offsets[i] = offsets[i - 1] + bucket_size * 32 + 1;
     }
 
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
@@ -227,20 +236,72 @@ fn main() {
                 records.push(record);
                 local_size += RECORD_SIZE;
 
-                // println!(
-                //     "Records generated for prefix {}: {:?}",
-                //     prefix,
-                //     records.len()
-                // );
+                println!(
+                    "Records generated for prefix {}: {:?}",
+                    prefix,
+                    records.len()
+                );
             }
         });
 
-        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
+        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
+            .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
     }
 
-    // println!("Offsets vector: {:?}", offsets_vector);
+    // sorting stored hashes
+    if sorting_on {
+        let mut offsets = vec![0; num_buckets];
+
+        for i in 1..num_buckets {
+            offsets[i] = offsets[i - 1] + bucket_size * 32 + 1;
+        }
+
+        let path: PathBuf = PathBuf::from("./../../output").join(output_file);
+
+        (0..num_buckets).into_par_iter().for_each(|bucket_index| {
+            let mut file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&path)
+                .expect("Error opening file");
+
+            let start = offsets[bucket_index] as u64;
+            let end = start + (bucket_size * RECORD_SIZE) as u64;
+
+            let mut reader = BufReader::new(&file);
+            reader
+                .seek(SeekFrom::Start(start))
+                .expect("Error seeking to start of bucket");
+
+            let mut bucket_records = Vec::with_capacity(bucket_size);
+            let mut buffer = [0; RECORD_SIZE];
+
+            while reader
+                .stream_position()
+                .expect("Error getting stream position")
+                < end
+            {
+                if let Ok(_) = reader.read_exact(&mut buffer) {
+                    bucket_records.push(buffer.clone());
+                } else {
+                    break;
+                }
+            }
+
+            // Sort the records in the current bucket
+            bucket_records.sort_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
+
+            // Write the sorted records back to the file
+            file.seek(SeekFrom::Start(start))
+                .expect("Error seeking to start of bucket");
+            for record in bucket_records {
+                file.write_all(&record)
+                    .expect("Error writing record to file");
+            }
+        });
+    }
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
