@@ -10,6 +10,7 @@ use std::time::Instant;
 mod hash_generator;
 mod print_records;
 mod store_hashes;
+mod hash_sorter;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
@@ -110,6 +111,12 @@ fn main() {
 
     let output_file = "output.bin";
 
+    let sorting_on = matches
+        .value_of("sorting_on")
+        .unwrap_or("true")
+        .parse::<bool>()
+        .expect("Please provide a valid boolean value for sorting_on");
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
@@ -200,7 +207,7 @@ fn main() {
     let mut offsets = vec![0; num_buckets];
 
     for i in 1..num_buckets {
-        offsets[i] = offsets[i - 1] + bucket_size * 32;
+        offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
     }
 
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
@@ -235,9 +242,25 @@ fn main() {
             }
         });
 
-        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector).expect("Error flushing to disk");
+        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
+            .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
+    }
+
+    if sorting_on {
+        let mut offsets = vec![0; num_buckets];
+
+        for i in 1..num_buckets {
+            offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
+        }
+
+        let path = format!("./../../output/{}", output_file);
+
+        // Parallel processing of each bucket using rayon
+        (0..num_buckets).into_par_iter().for_each(|bucket_index| {
+            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets);
+        });
     }
 
     // println!("Offsets vector: {:?}", offsets_vector);
