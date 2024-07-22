@@ -137,12 +137,6 @@ fn main() {
         .build_global()
         .unwrap();
 
-    info!("Opening Vault Entrance...");
-
-    // initialize tracker to track progress of vault operations
-    let mut tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(1));
-    let start_vault_timer = Instant::now();
-
     // if -f flag is not provided, calculate file size based on k value
     if file_size == 0 {
         file_size = num_records * RECORD_SIZE;
@@ -228,6 +222,13 @@ fn main() {
         write_size /= 2;
     }
 
+    info!("Opening Vault Entrance...");
+
+    // initialize tracker to track progress of vault operations
+    let mut tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(1));
+    tracker.set_stage("Initialization");
+    let start_vault_timer = Instant::now();
+
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(num_buckets);
 
     let thread_memory_limit = if file_size < memory_size {
@@ -280,6 +281,7 @@ fn main() {
             // tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
         });
 
+        tracker.set_stage("Storing");
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
