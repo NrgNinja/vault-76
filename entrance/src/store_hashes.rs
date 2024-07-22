@@ -3,7 +3,7 @@ use crate::{Record, RECORD_SIZE};
 use dashmap::DashMap;
 // use rayon::prelude::*;
 use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::PathBuf;
 use std::sync::RwLock;
 

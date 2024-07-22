@@ -6,17 +6,14 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use spdlog::prelude::*;
 use std::f64;
-use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
-use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
 
 mod hash_generator;
+mod hash_sorter;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
-mod hash_sorter;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
@@ -130,11 +127,7 @@ fn main() {
 
     let output_file = "output.bin";
 
-    let sorting_on = matches
-        .value_of("sorting_on")
-        .unwrap_or("true")
-        .parse::<bool>()
-        .expect("Please provide a valid boolean value for sorting_on");
+    let verify = matches.is_present("verify");
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
