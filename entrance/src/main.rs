@@ -286,7 +286,7 @@ fn main() {
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
-        tracker.log_progress_if_needed(); // log progress after each flush
+        // tracker.log_progress_if_needed(); // log progress after each flush
     }
 
     // if an output file is specified by the command line, it will write to that file
