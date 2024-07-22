@@ -41,3 +41,35 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
     }
     Ok(())
 }
+
+pub fn verify_records_sorted() -> io::Result<()> {
+    let path = "./../../output/output.bin";
+    let file = File::open(path)?;
+    let mut reader = BufReader::new(file);
+
+    let mut last_hash = vec![0u8; HASH_SIZE]; // Initially the smallest possible hash
+    let mut is_first = true;
+
+    loop {
+        match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
+            Ok(record) => {
+                if is_first {
+                    last_hash = record.hash.to_vec();
+                    is_first = false;
+                } else {
+                    if last_hash > record.hash.to_vec() {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            "output.bin doesn't seem to be sorted correctly",
+                        ));
+                    }
+                    last_hash = record.hash.to_vec();
+                }
+            }
+            Err(_) => break,
+        }
+    }
+
+    println!("output.bin seems to be sorted correctly");
+    Ok(())
+}

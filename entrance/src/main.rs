@@ -77,6 +77,13 @@ fn main() {
                 .long("prefix")
                 .takes_value(true)
                 .help("Specify the prefix length to extract from the hash"))
+        .arg(
+            Arg::with_name("verify")
+                .short('v')
+                .long("verify")
+                .takes_value(false)  // Automatically true if used, false otherwise
+                .help("Verify that the hashes in the output file are in sorted order"),
+        )
         .get_matches();
 
     let k = matches
@@ -112,6 +119,8 @@ fn main() {
         .expect("Please provide a valid number for file_size");
 
     let output_file = "output.bin";
+
+    let verify = matches.is_present("verify");
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -304,6 +313,13 @@ fn main() {
         match print_records::print_records_from_file(num_records_to_print) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
             Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
+    }
+
+    if verify {
+        match print_records::verify_records_sorted() {
+            Ok(_) => println!("Verification successful."),
+            Err(e) => println!("Verification failed: {}", e),
         }
     }
 }
