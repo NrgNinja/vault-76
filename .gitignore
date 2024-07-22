@@ -3,3 +3,5 @@ entrance/target/debug/
 entrance/target/
 Cargo.lock
 output.bin
+entrance/output
+entrance/stats
