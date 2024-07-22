@@ -135,12 +135,6 @@ fn main() {
         .build_global()
         .unwrap();
 
-    info!("Opening Vault Entrance...");
-
-    // initialize tracker to track progress of vault operations
-    let mut tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(1));
-    let start_vault_timer = Instant::now();
-
     // if -f flag is not provided, calculate file size based on k value
     if file_size == 0 {
         file_size = num_records * RECORD_SIZE;
@@ -229,6 +223,14 @@ fn main() {
         write_size /= 2;
     }
 
+    // configure_logging();
+    info!("Opening Vault Entrance...");
+
+    // initialize tracker to track progress of vault operations
+    let tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(1));
+    tracker.set_stage("[INITIALIZING]");
+    let start_vault_timer = Instant::now();
+
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(num_buckets);
 
     let thread_memory_limit = if file_size < memory_size {
@@ -249,7 +251,6 @@ fn main() {
 
     // println!("Offset vector for generation: {:?}", offsets_vector);
 
-    tracker.set_stage("Generation");
     while total_generated < file_size {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
             let mut local_size = 0;
@@ -257,6 +258,7 @@ fn main() {
                 .try_into()
                 .unwrap();
 
+            tracker.set_stage("[HASHGEN]");
             while local_size < thread_memory_limit {
                 let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size);
 
@@ -277,14 +279,15 @@ fn main() {
                 // );
             }
             // completed a batch of records processed
-            // TODO: issues with this line, cannot mutate immutable item (rwlock + mutex slow af)
-            // tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+            tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
         });
 
+        tracker.set_stage("[WRITING]");
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
+        tracker.update_records_processed(total_generated as u64 - tracker.get_records_processed());
     }
 
     if sorting_on {
@@ -308,7 +311,9 @@ fn main() {
         println!("Sorting took {:?}", sorting_duration);
     }
 
-    // println!("Offsets vector: {:?}", offsets_vector);
+    // Final log to mark completion
+    tracker.set_stage("[DONE]");
+    tracker.update_records_processed(num_records as u64 - tracker.get_records_processed());
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
@@ -341,3 +346,14 @@ fn main() {
         }
     }
 }
+
+// fn configure_logging() {
+//     // Initialize logger here if not already initialized
+//     let logger = spdlog::default_logger();
+
+//     // Set pattern: only display time, log level in uppercase, and the message
+//     logger.set_pattern("[%^%H:%M:%S%$] [%L] %v");
+
+//     // Apply changes to the default logger if needed
+//     spdlog::set_default_logger(logger);
+// }
