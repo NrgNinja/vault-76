@@ -58,13 +58,15 @@ pub fn flush_to_disk(
 
     let mut writer = BufWriter::new(&file);
 
+    // Lock the offsets vector for updating
+    let mut offsets = offsets.write().unwrap();
+
     for entry in records.iter() {
         let (prefix, records) = entry.pair();
-        let mut offsets = offsets.write().unwrap(); // Acquire write lock on offsets
-        let offset = offsets[*prefix]; // Get current offset for this bucket
+        let offset = offsets[*prefix]; // Current offset for this bucket
+        writer.seek(SeekFrom::Start(offset as u64))?; // Position the writer
 
-        writer.seek(SeekFrom::Start(offset as u64))?; // Move to the correct position in the file
-
+        // Write all records for this bucket
         for record in records {
             // println!("Writing record: {:?} with prefix: {}", record, prefix);
             // println!("Offsets vector before changing: {:?}", offsets[*prefix]);
@@ -73,6 +75,8 @@ pub fn flush_to_disk(
             offsets[*prefix] += RECORD_SIZE; // Update offset after writing
             // println!("Offsets vector: {:?}", offsets[*prefix]);
         }
+        // Update the offset for this bucket after writing all records
+        offsets[*prefix] = offset + records.len() * RECORD_SIZE; // Increment by the number of bytes written
     }
     writer.flush()?;
     file.sync_all()?;

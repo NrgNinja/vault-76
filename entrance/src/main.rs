@@ -1,17 +1,20 @@
 // this file holds the main driver of our vault codebase
+use crate::progress_tracker::ProgressTracker;
 use clap::{App, Arg};
 use dashmap::DashMap;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use spdlog::prelude::*;
 use std::f64;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::RwLock;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 mod hash_generator;
 mod print_records;
+mod progress_tracker;
 mod store_hashes;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
@@ -26,9 +29,9 @@ struct Record {
 
 fn main() {
     // defines letters for arguments that the user can call from command line
-    let matches = App::new("Vault")
-        .version("2.0")
-        .about("Generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a vector, sort them accordingly, and even look them up efficiently.")
+    let matches = App::new("Vault-76")
+        .version("3.0")
+        .about("Cryptographic hash tool that generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a DashMap, by using a specified prefix as the key, and the record as a value. You can also look up records efficiently.")
         .arg(
             Arg::with_name("k-value")
                 .short('k') // you can change this flag
@@ -70,13 +73,20 @@ fn main() {
                 .short('m')
                 .long("memory_limit")
                 .takes_value(true)
-                .help("Limit memory"),)
+                .help("How much memory you want to limit for the vault to use"),)
         .arg(
             Arg::with_name("prefix_length")
                 .short('x')
                 .long("prefix")
                 .takes_value(true)
                 .help("Specify the prefix length to extract from the hash"))
+        .arg(
+            Arg::with_name("verify")
+                .short('v')
+                .long("verify")
+                .takes_value(false)  // Automatically true if used, false otherwise
+                .help("Verify that the hashes in the output file are in sorted order"),
+        )
         .get_matches();
 
     let k = matches
@@ -119,12 +129,18 @@ fn main() {
 
     let output_file = "output.bin";
 
+    let verify = matches.is_present("verify");
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
         .unwrap();
 
+    info!("Opening Vault Entrance...");
+
+    // initialize tracker to track progress of vault operations
+    let mut tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(1));
     let start_vault_timer = Instant::now();
 
     // if -f flag is not provided, calculate file size based on k value
@@ -179,16 +195,32 @@ fn main() {
             expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
 
-            println!("Memory size: {}", memory_size);
-            println!("File size: {} bytes", file_size);
-            println!("Write size (memory bucket size): {} bytes", write_size); // memory bucket size
+            println!(
+                "Memory size: {} bytes ({} GB)",
+                memory_size,
+                memory_size / 1024 / 1024 / 1024
+            );
+            println!(
+                "File size: {} bytes ({} GB)",
+                file_size,
+                file_size / 1024 / 1024 / 1024
+            );
+            println!(
+                "Write size [memory bucket size]: {} bytes ({} MB)",
+                write_size,
+                write_size / 1024 / 1024
+            ); // memory bucket size
             println!("Flush size: {}", flush_size); // how many times the flush happens
             println!("Disk bucket size (in records): {}", bucket_size); // Records in 1 disk bucket
             println!("Num buckets: {}", num_buckets);
-            println!("Prefix size: {}", prefix_size);
+            println!("Prefix size: {} bits", prefix_size);
             println!("Expected total flushes: {}", expected_total_flushes);
-            println!("Sort memory: {} bytes", sort_memory);
-            println!("Num records: {}", num_records);
+            println!(
+                "Sort memory: {} bytes ({} MB)",
+                sort_memory,
+                sort_memory / 1024 / 1024
+            );
+            println!("Number of records: {}", num_records);
 
             break;
         }
@@ -216,6 +248,7 @@ fn main() {
 
     // println!("Offset vector: {:?}", offsets_vector);
 
+    tracker.set_stage("Generation");
     while total_generated < file_size {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
             let mut local_size = 0;
@@ -236,90 +269,66 @@ fn main() {
                 records.push(record);
                 local_size += RECORD_SIZE;
 
-                println!(
-                    "Records generated for prefix {}: {:?}",
-                    prefix,
-                    records.len()
-                );
+                // println!(
+                //     "Records generated for prefix {}: {:?}",
+                //     prefix,
+                //     records.len()
+                // );
             }
+            // completed a batch of records processed
+            // TODO: issues with this line, cannot mutate immutable item (rwlock + mutex slow af)
+            // tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
         });
 
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
+        tracker.log_progress_if_needed(); // log progress after each flush
     }
 
-    // sorting stored hashes
-    if sorting_on {
-        let mut offsets = vec![0; num_buckets];
+    // if an output file is specified by the command line, it will write to that file
+    // if !output_file.is_empty() {
+    //     let _ = store_hashes::store_hashes_optimized(
+    //         &map,
+    //         &output_file,
+    //         memory_limit_bytes,
+    //         RECORD_SIZE,
+    //     );
+    // }
 
-        for i in 1..num_buckets {
-            offsets[i] = offsets[i - 1] + bucket_size * 32 + 1;
-        }
-
-        let path: PathBuf = PathBuf::from("./../../output").join(output_file);
-
-        (0..num_buckets).into_par_iter().for_each(|bucket_index| {
-            let mut file = std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&path)
-                .expect("Error opening file");
-
-            let start = offsets[bucket_index] as u64;
-            let end = start + (bucket_size * RECORD_SIZE) as u64;
-
-            let mut reader = BufReader::new(&file);
-            reader
-                .seek(SeekFrom::Start(start))
-                .expect("Error seeking to start of bucket");
-
-            let mut bucket_records = Vec::with_capacity(bucket_size);
-            let mut buffer = [0; RECORD_SIZE];
-
-            while reader
-                .stream_position()
-                .expect("Error getting stream position")
-                < end
-            {
-                if let Ok(_) = reader.read_exact(&mut buffer) {
-                    bucket_records.push(buffer.clone());
-                } else {
-                    break;
-                }
-            }
-
-            // Sort the records in the current bucket
-            bucket_records.sort_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
-
-            // Write the sorted records back to the file
-            file.seek(SeekFrom::Start(start))
-                .expect("Error seeking to start of bucket");
-            for record in bucket_records {
-                file.write_all(&record)
-                    .expect("Error writing record to file");
-            }
-        });
-    }
+    // Final log to mark completion
+    tracker.set_stage("Completed");
+    tracker.update_records_processed(num_records as u64 - tracker.get_records_processed());
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
     if !output_file.is_empty() {
-        print!(", stored");
+        print!(" & stored");
     }
     println!(" {} records in {:?}", num_records, duration);
 
-    let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
-    println!(
-        "Length of the offsets vector: {}",
-        offsets_vector_read.len()
-    );
+    // let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
+    // println!(
+    //     "Length of the offsets vector: {}",
+    //     offsets_vector_read.len()
+    // );
+
+    // for (index, offset) in offsets_vector_read.iter().enumerate() {
+    //     println!("Offset[{}]: {}", index, offset);
+    // }
 
     if num_records_to_print != 0 {
         match print_records::print_records_from_file(num_records_to_print) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
             Err(e) => eprintln!("Error deserializing hashes: {}", e),
+        }
+    }
+
+    if verify {
+        match print_records::verify_records_sorted() {
+            Ok(_) => println!("Verification successful."),
+            Err(e) => println!("Verification failed: {}", e),
         }
     }
 }
