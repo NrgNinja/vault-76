@@ -14,7 +14,7 @@ mod hash_sorter;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
-mod microbenchmark;
+// mod microbenchmark;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
