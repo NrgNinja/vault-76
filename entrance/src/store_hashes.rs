@@ -80,6 +80,6 @@ pub fn flush_to_disk(
         offsets[*prefix] = offset + records.len() * RECORD_SIZE; // Increment by the number of bytes written
     }
     writer.flush()?;
-    file.sync_all()?;
+    // file.sync_all()?;
     Ok(())
 }
