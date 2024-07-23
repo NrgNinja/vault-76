@@ -33,6 +33,7 @@ impl ProgressTracker {
     pub fn set_stage(&self, stage: &str) {
         let mut current_stage = self.current_stage.lock().unwrap();
         *current_stage = stage.to_string();
+        info!("Stage: {}", *current_stage);
     }
 
     fn start_progress_thread(&self) {
