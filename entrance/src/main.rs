@@ -72,6 +72,11 @@ fn main() {
                 .takes_value(true)
                 .help("String hash to lookup from the data"),
         )
+        .arg(
+            Arg::with_name("memory_limit")
+                .short('m').long("memory_limit")
+                .takes_value(true)
+                .help("Memory limit for the vault"))
         .get_matches();
 
     let k = matches
@@ -80,7 +85,7 @@ fn main() {
         .parse::<u32>()
         .expect("Please provide a valid integer for k");
 
-    let num_records = 2u64.pow(k);
+    let mut num_records = 2u64.pow(k) as usize;
 
     let num_threads = matches
         .value_of("threads")
@@ -114,7 +119,13 @@ fn main() {
 
     let target_hash = matches.value_of("target_hash").unwrap_or("0");
 
-    let directory = "output";
+    let memory_limit = matches
+        .value_of("memory_limit")
+        .unwrap_or("2147483648")
+        .parse::<usize>()
+        .expect("Please provide a valid number for memory limit");
+
+    let directory = "../../output";
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -127,6 +138,8 @@ fn main() {
     if k != 0 {
         // println!("Populating the vault...");
         let start_hash_gen_timer: Instant = Instant::now();
+
+        num_records = memory_limit / RECORD_SIZE;
 
         let mut hashes: Vec<Record> = (0..num_records)
             .into_par_iter()
@@ -159,7 +172,7 @@ fn main() {
         // Calls store_hashes function to serialize generated hashes into binary and store them on disk -- sometimes takes 4-8sec
         if writing_on {
             let start_store_output_timer: Instant = Instant::now();
-            let index_file_path = "output/file_index.bin";
+            let index_file_path = "../../output/file_index.bin";
 
             let results = hashes
                 .par_chunks(chunk_size)

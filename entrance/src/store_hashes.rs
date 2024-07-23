@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::process::Command;
 
 pub fn store_hashes_chunk(chunk: &[Record], filename: &String) -> io::Result<()> {
-    let path = format!("output/{}", filename);
+    let path = format!("../../output/{}", filename);
     let path = path.as_str();
 
     let size = chunk.len() * RECORD_SIZE;
