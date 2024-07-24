@@ -58,7 +58,6 @@ impl ProgressTracker {
         let last_processed_count = self.last_processed_count.clone();
 
         thread::spawn(move || {
-            let last_processed = 0;
             while Arc::strong_count(&records) > 1 {
                 thread::sleep(interval);
                 let now_processed = *records.lock().unwrap();
@@ -97,7 +96,7 @@ impl ProgressTracker {
         });
     }
 
-    pub fn get_records_processed(&self) -> u64 {
-        *self.records_processed.lock().unwrap()
-    }
+    // pub fn get_records_processed(&self) -> u64 {
+    //     *self.records_processed.lock().unwrap()
+    // }
 }
