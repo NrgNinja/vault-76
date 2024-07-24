@@ -2,7 +2,7 @@ use rayon::slice::ParallelSliceMut;
 use std::{
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     sync::RwLock,
-}; // Add this line to import the ParallelSliceMut trait
+};
 
 use crate::{NONCE_SIZE, RECORD_SIZE};
 
@@ -43,18 +43,8 @@ pub fn sort_hashes(
         }
     }
 
-    let start_sorting = std::time::Instant::now();
-
     // Sort the records in the current bucket
     bucket_records.par_sort_unstable_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
-
-    let sorting_duration = start_sorting.elapsed();
-    println!(
-        "Sorting bucket {} took: {:?}",
-        bucket_index, sorting_duration
-    );
-
-    let start_writing = std::time::Instant::now();
 
     let mut writer = BufWriter::new(&file);
 
@@ -68,10 +58,4 @@ pub fn sort_hashes(
     }
 
     writer.flush().expect("Error flushing writer");
-
-    let writing_duration = start_writing.elapsed();
-    println!(
-        "Writing sorted bucket {} took: {:?}",
-        bucket_index, writing_duration
-    );
 }

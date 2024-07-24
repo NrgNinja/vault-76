@@ -181,9 +181,9 @@ fn main() {
     let mut bucket_size = 0;
     let mut num_buckets = 0;
     let mut prefix_size = 0;
-    let mut expected_total_flushes;
-    let mut sort_memory = 0;
-    let mut sort_buckets = 0;
+    // let mut expected_total_flushes;
+    let mut sort_memory;
+    // let mut sort_buckets = 0;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {
@@ -194,7 +194,7 @@ fn main() {
         num_buckets = 2usize.pow(prefix_size as u32);
         prefix_size = (f64::log(num_buckets as f64, 2.0)).ceil() as usize;
         bucket_size = file_size / num_buckets; // disk bucket size (in bytes)
-        expected_total_flushes = file_size / write_size;
+                                               // expected_total_flushes = file_size / write_size;
         sort_memory = bucket_size * num_threads;
 
         // valid configuration
@@ -207,10 +207,10 @@ fn main() {
             file_size = bucket_size * num_buckets;
             sort_memory = bucket_size * num_threads;
             num_records = file_size / RECORD_SIZE;
-            expected_total_flushes = file_size / write_size;
+            // expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
-            let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
-            sort_buckets = num_buckets / sort_ratio;
+            // let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
+            // sort_buckets = num_buckets / sort_ratio;
 
             println!(
                 "Memory size: {} bytes ({} GB)",
@@ -231,7 +231,7 @@ fn main() {
             println!("Disk bucket size (in records): {}", bucket_size); // Records in 1 disk bucket
             println!("Num buckets: {}", num_buckets);
             println!("Prefix size: {} bits", prefix_size);
-            println!("Expected total flushes: {}", expected_total_flushes);
+            // println!("Expected total flushes: {}", expected_total_flushes);
             println!(
                 "Sort memory: {} bytes ({} MB)",
                 sort_memory,
@@ -305,7 +305,7 @@ fn main() {
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
-        tracker.update_records_processed(total_generated as u64 - tracker.get_records_processed());
+        tracker.update_records_processed(total_generated as u64);
     }
 
     let generation_writing_duration = start_generation_writing.elapsed();
@@ -332,13 +332,20 @@ fn main() {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
         });
 
+        // Syncing file to disk
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .open(&path)
+            .expect("Error opening file");
+        file.sync_data().expect("Error syncing data");
+
         let sorting_duration = start_sorting.elapsed();
         println!("Sorting took {:?}", sorting_duration);
     }
 
     // Final log to mark completion
     tracker.set_stage("[DONE]");
-    tracker.update_records_processed(num_records as u64 - tracker.get_records_processed());
+    tracker.update_records_processed(num_records as u64);
 
     let duration = start_vault_timer.elapsed();
     print!("Generated");
@@ -346,17 +353,7 @@ fn main() {
         print!(" & stored");
     }
     println!(" {} records in {:?}", num_records, duration);
-
-    // let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
-    // println!(
-    //     "Length of the offsets vector: {}",
-    //     offsets_vector_read.len()
-    // );
-
-    // for (index, offset) in offsets_vector_read.iter().enumerate() {
-    //     println!("Offset[{}]: {}", index, offset);
-    // }
-
+    
     if num_records_to_print != 0 {
         match print_records::print_records_from_file(num_records_to_print) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
