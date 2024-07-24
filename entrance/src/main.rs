@@ -2,6 +2,7 @@
 use crate::progress_tracker::ProgressTracker;
 use clap::{App, Arg};
 use dashmap::DashMap;
+use rand::random;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use spdlog::prelude::*;
@@ -14,7 +15,6 @@ mod hash_sorter;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
-// mod microbenchmark;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
@@ -252,11 +252,9 @@ fn main() {
     let start_generation_writing = Instant::now();
 
     while total_generated < file_size {
-        (0..num_threads).into_par_iter().for_each(|thread_index| {
+        (0..num_threads).into_par_iter().for_each(|_thread_index| {
             let mut local_size = 0;
-            let mut nonce: u64 = (thread_index * (thread_memory_limit / RECORD_SIZE))
-                .try_into()
-                .unwrap();
+            let mut nonce: u64 = random();
 
             tracker.set_stage("[HASHGEN]");
             while local_size < thread_memory_limit {
@@ -291,7 +289,10 @@ fn main() {
     }
 
     let generation_writing_duration = start_generation_writing.elapsed();
-    println!("Generation & Writing took {:?}", generation_writing_duration);
+    println!(
+        "Generation & Writing took {:?}",
+        generation_writing_duration
+    );
 
     if sorting_on {
         tracker.set_stage("[SORTING]");
@@ -299,7 +300,7 @@ fn main() {
 
         // Creating an offset vector for sorting
         let mut offsets = vec![0; num_buckets];
-        for i in 1..num_buckets{
+        for i in 1..num_buckets {
             offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);

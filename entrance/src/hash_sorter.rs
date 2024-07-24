@@ -1,10 +1,10 @@
+use rayon::slice::ParallelSliceMut;
 use std::{
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     sync::RwLock,
-};
+}; // Add this line to import the ParallelSliceMut trait
 
 use crate::{NONCE_SIZE, RECORD_SIZE};
-use rayon::slice::ParallelSliceMut; // Add this line to import the ParallelSliceMut trait
 
 pub fn sort_hashes(
     path: &String,
@@ -29,7 +29,7 @@ pub fn sort_hashes(
         .expect("Error seeking to start of bucket");
 
     let mut bucket_records = Vec::with_capacity(bucket_size);
-    let mut buffer = vec![0; RECORD_SIZE];
+    let mut buffer = [0; RECORD_SIZE];
 
     while reader
         .stream_position()
@@ -75,5 +75,3 @@ pub fn sort_hashes(
         bucket_index, writing_duration
     );
 }
-
-
