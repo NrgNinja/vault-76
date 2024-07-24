@@ -11,9 +11,11 @@ use std::time::{Duration, Instant};
 
 mod hash_generator;
 mod hash_sorter;
+mod lookup;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
+// mod microbenchmark;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
@@ -65,19 +67,22 @@ fn main() {
                 .long("file_size")
                 .takes_value(true)
                 .default_value("0")
-                .help("File size to be populated with hashes"))
+                .help("File size to be populated with hashes"),
+        )
         .arg(
             Arg::with_name("memory_limit")
                 .short('m')
                 .long("memory_limit")
                 .takes_value(true)
-                .help("How much memory you want to limit for the vault to use"),)
+                .help("How much memory you want to limit for the vault to use"),
+        )
         .arg(
             Arg::with_name("prefix_length")
                 .short('x')
                 .long("prefix")
                 .takes_value(true)
-                .help("Specify the prefix length to extract from the hash"))
+                .help("Specify the prefix length to extract from the hash"),
+        )
         .arg(
             Arg::with_name("verify")
                 .short('v')
@@ -85,7 +90,24 @@ fn main() {
                 .takes_value(false)  // Automatically true if used, false otherwise
                 .help("Verify that the hashes in the output file are in sorted order"),
         )
+        .arg(
+            Arg::with_name("lookup")
+                .short('l')
+                .long("lookup")
+                .takes_value(true)
+                .help("Lookup a record by a prefix"),
+            )
         .get_matches();
+
+    // determine if lookup is specified, otherwise continue normal vault operations
+    if let Some(lookup_value) = matches.value_of("lookup") {
+        let filename = "output.bin";
+
+        if let Err(e) = lookup::lookup_by_prefix(filename, lookup_value) {
+            eprintln!("Error during lookup: {}", e);
+        }
+        return;
+    }
 
     let k = matches
         .value_of("k-value")
@@ -160,7 +182,8 @@ fn main() {
     let mut num_buckets = 0;
     let mut prefix_size = 0;
     let mut expected_total_flushes;
-    let mut sort_memory;
+    let mut sort_memory = 0;
+    let mut sort_buckets = 0;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {
@@ -186,6 +209,8 @@ fn main() {
             num_records = file_size / RECORD_SIZE;
             expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
+            let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
+            sort_buckets = num_buckets / sort_ratio;
 
             println!(
                 "Memory size: {} bytes ({} GB)",
@@ -220,7 +245,6 @@ fn main() {
         write_size /= 2;
     }
 
-    // configure_logging();
     info!("Opening Vault Entrance...");
 
     // initialize tracker to track progress of vault operations
@@ -238,15 +262,14 @@ fn main() {
 
     let mut total_generated = 0;
 
+    // Defining offset vector for generation phase
     let mut offsets = vec![0; num_buckets];
-
     for i in 1..num_buckets {
         offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
     }
-
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-    // println!("Offset vector: {:?}", offsets_vector);
+    let start_generation_writing = Instant::now();
 
     while total_generated < file_size {
         (0..num_threads).into_par_iter().for_each(|thread_index| {
@@ -287,20 +310,32 @@ fn main() {
         tracker.update_records_processed(total_generated as u64 - tracker.get_records_processed());
     }
 
+    let generation_writing_duration = start_generation_writing.elapsed();
+    println!(
+        "Generation & Writing took {:?}",
+        generation_writing_duration
+    );
+
     if sorting_on {
         tracker.set_stage("[SORTING]");
-        let mut offsets = vec![0; num_buckets];
+        let start_sorting = Instant::now();
 
+        // Creating an offset vector for sorting
+        let mut offsets = vec![0; num_buckets];
         for i in 1..num_buckets {
             offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
         }
+        let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
         let path = format!("./../../output/{}", output_file);
 
         // Parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
-            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets);
+            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
         });
+
+        let sorting_duration = start_sorting.elapsed();
+        println!("Sorting took {:?}", sorting_duration);
     }
 
     // Final log to mark completion
@@ -338,14 +373,3 @@ fn main() {
         }
     }
 }
-
-// fn configure_logging() {
-//     // Initialize logger here if not already initialized
-//     let logger = spdlog::default_logger();
-
-//     // Set pattern: only display time, log level in uppercase, and the message
-//     logger.set_pattern("[%^%H:%M:%S%$] [%L] %v");
-
-//     // Apply changes to the default logger if needed
-//     spdlog::set_default_logger(logger);
-// }
