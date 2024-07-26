@@ -170,13 +170,8 @@ fn main() {
         memory_size
     };
 
-    let ratio = ((file_size as f64) / (memory_size as f64)).ceil() as usize; // gives 0 if file_size < memory_size
-    let mut write_size = if ratio > 0 {
-        1024 * 1024 / ratio
-    } else {
-        1024 * 1024 // default to 1 MB if ratio is zero
-    };
-
+    let ratio = ((file_size as f64) / (memory_size as f64)).ceil() as usize;
+    let mut write_size = 1024 * 1024 / ratio;
     let mut flush_size;
     let mut bucket_size = 0;
     let mut num_buckets = 0;
@@ -190,11 +185,10 @@ fn main() {
         flush_size = ratio;
         bucket_size = write_size * 1024 * flush_size;
         num_buckets = file_size / bucket_size;
-        prefix_size = (f64::log(num_buckets as f64, 2.0)).ceil() as usize;
+        prefix_size = (num_buckets as f64).log(2.0).ceil() as u32 + 1;
         num_buckets = 2usize.pow(prefix_size as u32);
-        prefix_size = (f64::log(num_buckets as f64, 2.0)).ceil() as usize;
+        prefix_size = (num_buckets as f64).log(2.0).ceil() as u32;
         bucket_size = file_size / num_buckets; // disk bucket size (in bytes)
-                                               // expected_total_flushes = file_size / write_size;
         sort_memory = bucket_size * num_threads;
 
         // valid configuration
@@ -207,10 +201,7 @@ fn main() {
             file_size = bucket_size * num_buckets;
             sort_memory = bucket_size * num_threads;
             num_records = file_size / RECORD_SIZE;
-            // expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
-            // let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
-            // sort_buckets = num_buckets / sort_ratio;
 
             println!(
                 "Memory size: {} bytes ({} GB)",
@@ -278,7 +269,7 @@ fn main() {
 
             tracker.set_stage("[HASHGEN]");
             while local_size < thread_memory_limit {
-                let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size);
+                let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize);
 
                 nonce += 1;
 
