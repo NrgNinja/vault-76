@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{NONCE_SIZE, RECORD_SIZE};
-use rayon::slice::ParallelSliceMut; // Add this line to import the ParallelSliceMut trait
 
 pub fn sort_hashes(
     path: &String,
@@ -12,7 +11,7 @@ pub fn sort_hashes(
     bucket_size: usize,
     offsets: &RwLock<Vec<usize>>,
 ) {
-    let offsets = offsets.write().unwrap(); // Acquire write lock on offsets
+    let offsets = offsets.read().unwrap(); // Acquire write lock on offsets
 
     let file = std::fs::OpenOptions::new()
         .read(true)
@@ -29,7 +28,7 @@ pub fn sort_hashes(
         .expect("Error seeking to start of bucket");
 
     let mut bucket_records = Vec::with_capacity(bucket_size);
-    let mut buffer = vec![0; RECORD_SIZE];
+    let mut buffer = [0; RECORD_SIZE];
 
     while reader
         .stream_position()
@@ -43,24 +42,15 @@ pub fn sort_hashes(
         }
     }
 
-    let start_sorting = std::time::Instant::now();
-
     // Sort the records in the current bucket
-    bucket_records.par_sort_unstable_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
-
-    let sorting_duration = start_sorting.elapsed();
-    println!(
-        "Sorting bucket {} took: {:?}",
-        bucket_index, sorting_duration
-    );
-
-    let start_writing = std::time::Instant::now();
+    bucket_records.sort_unstable_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
 
     let mut writer = BufWriter::new(&file);
 
     writer
         .seek(SeekFrom::Start(start))
         .expect("Error seeking to start of bucket");
+
     for record in bucket_records {
         writer
             .write_all(&record)
@@ -68,12 +58,4 @@ pub fn sort_hashes(
     }
 
     writer.flush().expect("Error flushing writer");
-
-    let writing_duration = start_writing.elapsed();
-    println!(
-        "Writing sorted bucket {} took: {:?}",
-        bucket_index, writing_duration
-    );
 }
-
-
