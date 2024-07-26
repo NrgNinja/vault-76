@@ -2,6 +2,7 @@
 use crate::progress_tracker::ProgressTracker;
 use clap::{App, Arg};
 use dashmap::DashMap;
+use rand::random;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use spdlog::prelude::*;
@@ -15,7 +16,6 @@ mod lookup;
 mod print_records;
 mod progress_tracker;
 mod store_hashes;
-// mod microbenchmark;
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
@@ -181,9 +181,9 @@ fn main() {
     let mut bucket_size = 0;
     let mut num_buckets = 0;
     let mut prefix_size = 0;
-    let mut expected_total_flushes;
-    let mut sort_memory = 0;
-    let mut sort_buckets = 0;
+    // let mut expected_total_flushes;
+    let mut sort_memory;
+    // let mut sort_buckets = 0;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {
@@ -194,7 +194,7 @@ fn main() {
         num_buckets = 2usize.pow(prefix_size as u32);
         prefix_size = (f64::log(num_buckets as f64, 2.0)).ceil() as usize;
         bucket_size = file_size / num_buckets; // disk bucket size (in bytes)
-        expected_total_flushes = file_size / write_size;
+                                               // expected_total_flushes = file_size / write_size;
         sort_memory = bucket_size * num_threads;
 
         // valid configuration
@@ -207,10 +207,10 @@ fn main() {
             file_size = bucket_size * num_buckets;
             sort_memory = bucket_size * num_threads;
             num_records = file_size / RECORD_SIZE;
-            expected_total_flushes = file_size / write_size;
+            // expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
-            let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
-            sort_buckets = num_buckets / sort_ratio;
+            // let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
+            // sort_buckets = num_buckets / sort_ratio;
 
             println!(
                 "Memory size: {} bytes ({} GB)",
@@ -231,7 +231,7 @@ fn main() {
             println!("Disk bucket size (in records): {}", bucket_size); // Records in 1 disk bucket
             println!("Num buckets: {}", num_buckets);
             println!("Prefix size: {} bits", prefix_size);
-            println!("Expected total flushes: {}", expected_total_flushes);
+            // println!("Expected total flushes: {}", expected_total_flushes);
             println!(
                 "Sort memory: {} bytes ({} MB)",
                 sort_memory,
@@ -272,11 +272,9 @@ fn main() {
     let start_generation_writing = Instant::now();
 
     while total_generated < file_size {
-        (0..num_threads).into_par_iter().for_each(|thread_index| {
+        (0..num_threads).into_par_iter().for_each(|_thread_index| {
             let mut local_size = 0;
-            let mut nonce: u64 = (thread_index * (thread_memory_limit / RECORD_SIZE))
-                .try_into()
-                .unwrap();
+            let mut nonce: u64 = random();
 
             // tracker.set_stage("[HASHGEN]");
             while local_size < thread_memory_limit {
@@ -307,7 +305,7 @@ fn main() {
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
-        // tracker.update_records_processed(total_generated as u64 - tracker.get_records_processed());
+        tracker.update_records_processed(total_generated as u64);
     }
 
     let generation_writing_duration = start_generation_writing.elapsed();
@@ -327,12 +325,22 @@ fn main() {
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-        let path = format!("./../../output/{}", output_file);
+        let path = format!("output/{}", output_file);
 
         // Parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
         });
+
+        println!("------------------Syncing the file--------------");
+        // Syncing file to disk
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .open(&path)
+            .expect("Error opening file");
+        file.sync_data().expect("Error syncing data");
+
+        println!("------------------Closing the file--------------");
 
         let sorting_duration = start_sorting.elapsed();
         println!("Sorting took {:?}", sorting_duration);
