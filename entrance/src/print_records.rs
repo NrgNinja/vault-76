@@ -57,7 +57,7 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
 
                 prefix &= (1u64 << 6) - 1;
 
-               println!("{:<16} | {} | {}", nonce_decimal, hash_hex, prefix);
+                println!("{:<16} | {} | {}", nonce_decimal, hash_hex, prefix);
                 counter += 1;
             }
             Err(_) => break,
@@ -66,17 +66,20 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
     Ok(())
 }
 
-pub fn verify_records_sorted() -> io::Result<()> {
-    let path = "./../../output/output.bin";
+pub fn verify_records_sorted(expected_count: usize) -> io::Result<()> {
+    let path = "../../output/output.bin";
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
     let mut last_hash = vec![0u8; HASH_SIZE]; // Initially the smallest possible hash
     let mut is_first = true;
+    let mut record_count = 0;
 
     loop {
         match deserialize_from::<&mut BufReader<File>, Record>(&mut reader) {
             Ok(record) => {
+                record_count += 1;
+
                 if is_first {
                     last_hash = record.hash.to_vec();
                     is_first = false;
@@ -84,9 +87,7 @@ pub fn verify_records_sorted() -> io::Result<()> {
                     if last_hash > record.hash.to_vec() {
                         return Err(io::Error::new(
                             io::ErrorKind::Other,
-                            format!(
-                                "output.bin doesn't seem to be sorted correctly with hashes",
-                            ),
+                            format!("output.bin doesn't seem to be sorted correctly with hashes",),
                         ));
                     }
                     last_hash = record.hash.to_vec();
@@ -96,6 +97,16 @@ pub fn verify_records_sorted() -> io::Result<()> {
         }
     }
 
-    println!("output.bin seems to be sorted correctly");
+    if record_count != expected_count {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!(
+                "Expected {} records but found {}",
+                expected_count, record_count
+            ),
+        ));
+    }
+
+    println!("output.bin is sorted correctly and contains the expected number of records.");
     Ok(())
 }
