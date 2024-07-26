@@ -3,3 +3,4 @@ entrance/target/*
 entrance/output/*
 entrance/stats/*
 **/.DS_Store
+FlameGraph/*

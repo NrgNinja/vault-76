@@ -1,4 +1,3 @@
-use rayon::slice::ParallelSliceMut;
 use std::{
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     sync::RwLock,
@@ -12,7 +11,7 @@ pub fn sort_hashes(
     bucket_size: usize,
     offsets: &RwLock<Vec<usize>>,
 ) {
-    let offsets = offsets.write().unwrap(); // Acquire write lock on offsets
+    let offsets = offsets.read().unwrap(); // Acquire write lock on offsets
 
     let file = std::fs::OpenOptions::new()
         .read(true)
@@ -44,13 +43,14 @@ pub fn sort_hashes(
     }
 
     // Sort the records in the current bucket
-    bucket_records.par_sort_unstable_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
+    bucket_records.sort_unstable_by(|a, b| a[NONCE_SIZE..].cmp(&b[NONCE_SIZE..]));
 
     let mut writer = BufWriter::new(&file);
 
     writer
         .seek(SeekFrom::Start(start))
         .expect("Error seeking to start of bucket");
+
     for record in bucket_records {
         writer
             .write_all(&record)

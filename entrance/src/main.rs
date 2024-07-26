@@ -325,19 +325,22 @@ fn main() {
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-        let path = format!("./../../output/{}", output_file);
+        let path = format!("output/{}", output_file);
 
         // Parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
         });
 
+        println!("------------------Syncing the file--------------");
         // Syncing file to disk
         let file = std::fs::OpenOptions::new()
             .read(true)
             .open(&path)
             .expect("Error opening file");
         file.sync_data().expect("Error syncing data");
+
+        println!("------------------Closing the file--------------");
 
         let sorting_duration = start_sorting.elapsed();
         println!("Sorting took {:?}", sorting_duration);
@@ -353,7 +356,7 @@ fn main() {
         print!(" & stored");
     }
     println!(" {} records in {:?}", num_records, duration);
-    
+
     if num_records_to_print != 0 {
         match print_records::print_records_from_file(num_records_to_print) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
