@@ -20,6 +20,7 @@ mod store_hashes;
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
 const NONCE_SIZE: usize = 6;
+const OUTPUT_FOLDER: &str = "../../output";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Record {
@@ -268,6 +269,7 @@ fn main() {
             let mut nonce: u64 = random();
 
             tracker.set_stage("[HASHGEN]");
+            let start_hash_generation = Instant::now();
             while local_size < thread_memory_limit {
                 let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize);
 
@@ -287,13 +289,19 @@ fn main() {
                 //     records.len()
                 // );
             }
+            let hash_generation_duration = start_hash_generation.elapsed();
+            println!("Hash generation took {:?}", hash_generation_duration);
             // completed a batch of records processed
             tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
         });
 
         tracker.set_stage("[WRITING]");
+        let start_writing = Instant::now();
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
+        let writing_duration = start_writing.elapsed();
+        println!("Writing took {:?}", writing_duration);
+
         total_generated += thread_memory_limit * num_threads;
         map.clear();
         tracker.update_records_processed(total_generated as u64);
@@ -316,7 +324,7 @@ fn main() {
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-        let path = format!("../../output/{}", output_file);
+        let path = format!("{}/{}",OUTPUT_FOLDER, output_file);
 
         // Parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {

@@ -1,5 +1,5 @@
 // this file adds the operation to look up hashes based on a specified prefix
-use crate::Record;
+use crate::{Record, OUTPUT_FOLDER};
 use bincode;
 use std::fs::File;
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
@@ -9,7 +9,7 @@ use std::time::Instant;
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 
 pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
-    let path = PathBuf::from("./../../output").join(filename);
+    let path = PathBuf::from(OUTPUT_FOLDER).join(filename);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 

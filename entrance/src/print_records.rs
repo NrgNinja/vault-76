@@ -1,5 +1,5 @@
 // this file prints records specified by the command line flag: -p
-use crate::{Record, HASH_SIZE};
+use crate::{Record, HASH_SIZE, OUTPUT_FOLDER};
 use bincode::deserialize_from;
 use std::fs::File;
 use std::io::{self, BufReader};
@@ -19,7 +19,7 @@ fn hash_to_string(hash: &[u8; HASH_SIZE]) -> String {
 
 // this function reads the records from the output file, deserializes them and then prints them
 pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
-    let path = "./../../output/output.bin";
+    let path = format!("{}/output.bin", OUTPUT_FOLDER);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
@@ -67,7 +67,7 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
 }
 
 pub fn verify_records_sorted(expected_count: usize) -> io::Result<()> {
-    let path = "../../output/output.bin";
+    let path = format!("{}/output.bin", OUTPUT_FOLDER);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
@@ -87,7 +87,7 @@ pub fn verify_records_sorted(expected_count: usize) -> io::Result<()> {
                     if last_hash > record.hash.to_vec() {
                         return Err(io::Error::new(
                             io::ErrorKind::Other,
-                            format!("output.bin doesn't seem to be sorted correctly with hashes",),
+                            format!("output.bin is not sorted correctly with hashes",),
                         ));
                     }
                     last_hash = record.hash.to_vec();
