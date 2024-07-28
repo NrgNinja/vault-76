@@ -87,7 +87,7 @@ fn main() {
             Arg::with_name("verify")
                 .short('v')
                 .long("verify")
-                .takes_value(false)  // Automatically true if used, false otherwise
+                .takes_value(false)  // automatically true if used, false otherwise
                 .help("Verify that the hashes in the output file are in sorted order"),
         )
         .arg(
@@ -248,8 +248,8 @@ fn main() {
     info!("Opening Vault Entrance...");
 
     // initialize tracker to track progress of vault operations
-    // let tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(1));
-    // tracker.set_stage("[INITIALIZING]");
+    // tracker outputs progress every 2 seconds (you can reduce this, but more redundant output lines)
+    let tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(2));
     let start_vault_timer = Instant::now();
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(num_buckets);
@@ -262,21 +262,22 @@ fn main() {
 
     let mut total_generated = 0;
 
-    // Defining offset vector for generation phase
+    // defining offset vector for the generation phase
     let mut offsets = vec![0; num_buckets];
     for i in 1..num_buckets {
         offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
     }
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-    let start_generation_writing = Instant::now();
+    // let start_generation_writing = Instant::now();
 
+    // generate hashes and write them to disk
     while total_generated < file_size {
         (0..num_threads).into_par_iter().for_each(|_thread_index| {
             let mut local_size = 0;
             let mut nonce: u64 = random();
 
-            // tracker.set_stage("[HASHGEN]");
+            tracker.set_stage("[HASHGEN]");
             while local_size < thread_memory_limit {
                 let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size);
 
@@ -289,36 +290,29 @@ fn main() {
                 }
                 records.push(record);
                 local_size += RECORD_SIZE;
-
-                // println!(
-                //     "Records generated for prefix {}: {:?}",
-                //     prefix,
-                //     records.len()
-                // );
             }
             // completed a batch of records processed
-            // tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+            tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
         });
 
-        // tracker.set_stage("[WRITING]");
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
         map.clear();
-        tracker.update_records_processed(total_generated as u64);
     }
 
-    let generation_writing_duration = start_generation_writing.elapsed();
-    println!(
-        "Generation & Writing took {:?}",
-        generation_writing_duration
-    );
+    // let generation_writing_duration = start_generation_writing.elapsed();
+    // let generation_duration_in_seconds = generation_writing_duration.as_secs_f64();
+    // println!(
+    //     "Generation & Writing took {:.2} seconds",
+    //     generation_duration_in_seconds
+    // );
 
     if sorting_on {
-        // tracker.set_stage("[SORTING]");
-        let start_sorting = Instant::now();
+        tracker.set_stage("[SORTING]");
+        // let start_sorting = Instant::now();
 
-        // Creating an offset vector for sorting
+        // creating an offset vector for sorting
         let mut offsets = vec![0; num_buckets];
         for i in 1..num_buckets {
             offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
@@ -327,45 +321,44 @@ fn main() {
 
         let path = format!("output/{}", output_file);
 
-        // Parallel processing of each bucket using rayon
+        let records_per_bucket = (num_records / num_buckets) as u64;
+
+        // parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
+            tracker.update_records_processed(records_per_bucket);
         });
 
-        println!("------------------Syncing the file--------------");
-        // Syncing file to disk
+        // sync the file and close it once done
         let file = std::fs::OpenOptions::new()
             .read(true)
             .open(&path)
             .expect("Error opening file");
+        tracker.report_progress();
+        let sync_timer = Instant::now();
+        tracker.set_stage("[SYNCING]");
         file.sync_data().expect("Error syncing data");
+        let sync_duration = sync_timer.elapsed();
+        let sync_duration_in_seconds = sync_duration.as_secs_f64();
+        println!("Syncing file took {:.2} seconds", sync_duration_in_seconds);
 
-        println!("------------------Closing the file--------------");
-
-        let sorting_duration = start_sorting.elapsed();
-        println!("Sorting took {:?}", sorting_duration);
+        // let sorting_duration = start_sorting.elapsed();
+        // let sorting_duration_in_seconds = sorting_duration.as_secs_f64();
+        // println!("Sorting took {:.2} seconds", sorting_duration_in_seconds);
     }
 
-    // Final log to mark completion
-    // tracker.set_stage("[DONE]");
-    // tracker.update_records_processed(num_records as u64 - tracker.get_records_processed());
-
     let duration = start_vault_timer.elapsed();
-    // print!("Generated");
-    // if !output_file.is_empty() {
-    //     print!(" & stored");
-    // }
-    // println!(" {} records in {:?}", num_records, duration);
+    let duration_in_seconds = duration.as_secs_f64();
+    let hashes_per_second = num_records as f64 / duration_in_seconds / 1_000_000.0; // convert to MH/s
+    let bytes_per_second = file_size as f64 / 1024.0 / 1024.0 / duration_in_seconds; // convert bytes to megabytes
 
-    // let offsets_vector_read = offsets_vector.read().unwrap(); // Use .unwrap() for simplicity in examples; handle errors as appropriate in production code
-    // println!(
-    //     "Length of the offsets vector: {}",
-    //     offsets_vector_read.len()
-    // );
-
-    // for (index, offset) in offsets_vector_read.iter().enumerate() {
-    //     println!("Offset[{}]: {}", index, offset);
-    // }
+    println!(
+        "Completed {} GB vault [output.bin] in {:.2} seconds: {:.2} MH/s {:.2} MB/s",
+        file_size / 1024 / 1024 / 1024,
+        duration_in_seconds,
+        hashes_per_second,
+        bytes_per_second
+    );
 
     if num_records_to_print != 0 {
         match print_records::print_records_from_file(num_records_to_print) {
