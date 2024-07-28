@@ -4,3 +4,7 @@ entrance/output/*
 entrance/stats/*
 **/.DS_Store
 FlameGraph/*
+entrance/flamegraph.svg
+entrance/out.folded
+entrance/out.perf
+entrance/perf.data
