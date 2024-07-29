@@ -321,7 +321,7 @@ fn main() {
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-        let path = format!("output/{}", output_file);
+        let path = format!("{}/{}", OUTPUT_FOLDER, output_file);
 
         let records_per_bucket = (num_records / num_buckets) as u64;
 
