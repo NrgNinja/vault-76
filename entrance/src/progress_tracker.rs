@@ -1,5 +1,6 @@
 // this file serves prints the progress of each stage of the vault operations to the command line
 use spdlog::info;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -15,10 +16,16 @@ pub struct ProgressTracker {
     current_stage: Arc<Mutex<String>>,
     last_update_time: Arc<Mutex<Instant>>,
     last_processed_count: Arc<Mutex<u64>>,
+    flushes_completed: AtomicUsize,      // Add this line
+    expected_total_flushes: AtomicUsize, // Track expected flushes
 }
 
 impl ProgressTracker {
-    pub fn new(total_records: u64, update_interval: Duration) -> Arc<Self> {
+    pub fn new(
+        total_records: u64,
+        expected_flushes: usize,
+        update_interval: Duration,
+    ) -> Arc<Self> {
         let tracker = Arc::new(Self {
             start_time: Instant::now(),
             total_records,
@@ -28,8 +35,10 @@ impl ProgressTracker {
             current_stage: Arc::new(Mutex::new(String::from("[START]"))),
             last_update_time: Arc::new(Mutex::new(Instant::now())),
             last_processed_count: Arc::new(Mutex::new(0)),
+            flushes_completed: AtomicUsize::new(0), // Initialize as zero
+            expected_total_flushes: AtomicUsize::new(expected_flushes),
         });
-        tracker.start_progress_thread();
+        tracker.clone().start_progress_thread();
         tracker
     }
 
@@ -51,7 +60,7 @@ impl ProgressTracker {
     }
 
     // this one outputs the large throughput numbers
-    fn start_progress_thread(&self) {
+    fn start_progress_thread(self: Arc<Self>) {
         let interval = self.update_interval;
         let total_records = self.total_records;
         let current_stage = self.current_stage.clone();
@@ -69,6 +78,7 @@ impl ProgressTracker {
                 let now = Instant::now();
                 let elapsed = now.duration_since(last_time).as_secs_f64(); // time since last update
                 let progress = (now_processed as f32 / total_records as f32) * 100.0;
+                let flushes = self.flushes_completed.load(Ordering::SeqCst);
 
                 let eta = if now_processed > 0 && progress < 100.0 {
                     (elapsed / progress as f64) * (100.0 - progress) as f64 * 10 as f64
@@ -88,10 +98,12 @@ impl ProgressTracker {
                         info!("{}", current_stage.lock().unwrap().clone());
                     } else {
                         info!(
-                            "{}: {:.2}% complete, ETA: {:.1} seconds, Throughput: {:.2} MB/sec",
+                            "{}: {:.2}% complete, ETA: {:.1} seconds, Flushes: {}/{:?}, TPS: {:.2} MB/sec",
                             *current_stage.lock().unwrap(),
                             progress,
                             eta,
+                            flushes,
+                            self.expected_total_flushes,
                             throughput
                         );
                     }
@@ -104,67 +116,6 @@ impl ProgressTracker {
             }
         });
     }
-
-    // // this one outputs the smaller throughput numbers
-    // fn start_progress_thread(&self) {
-    //     let interval = self.update_interval;
-    //     let total_records = self.total_records;
-    //     let current_stage = self.current_stage.clone();
-    //     let stage_records = self.stage_records_processed.clone();
-    //     let last_update_time = self.last_update_time.clone();
-    //     let last_processed_count = self.last_processed_count.clone();
-
-    //     thread::spawn(move || {
-    //         let mut last_time = Instant::now();
-    //         let mut last_logged_progress: Option<(f32, f64, f64)> = None;
-
-    //         while Arc::strong_count(&stage_records) > 1 {
-    //             thread::sleep(interval);
-    //             let now_processed = *stage_records.lock().unwrap();
-    //             let now = Instant::now();
-    //             let elapsed = now.duration_since(last_time).as_secs_f64(); // time since last update
-    //             let progress = (now_processed as f32 / total_records as f32) * 100.0;
-
-    //             let eta = if now_processed > 0 && progress < 100.0 {
-    //                 (elapsed / progress as f64) * (100.0 - progress) as f64 * 10 as f64
-    //             } else {
-    //                 0.0
-    //             };
-
-    //             let bytes_processed = (now_processed - *last_processed_count.lock().unwrap())
-    //                 as f64
-    //                 * RECORD_SIZE as f64;
-    //             let elapsed_since_last_update =
-    //                 last_update_time.lock().unwrap().elapsed().as_secs_f64();
-    //             let throughput = if elapsed_since_last_update > 0.0 {
-    //                 bytes_processed / (1024.0 * 1024.0) / elapsed_since_last_update
-    //             } else {
-    //                 0.0
-    //             };
-
-    //             // check if the current progress, ETA, or throughput is different from the last logged values
-    //             let current_log = (progress, eta, throughput);
-    //             if last_logged_progress.map_or(true, |last| last != current_log) {
-    //                 if current_stage.lock().unwrap().clone() == "[SYNCING]" {
-    //                     info!("{}", current_stage.lock().unwrap().clone());
-    //                 } else {
-    //                     info!(
-    //                         "{}: {:.2}% complete, ETA: {:.1} seconds, Throughput: {:.2} MB/sec",
-    //                         *current_stage.lock().unwrap(),
-    //                         progress,
-    //                         eta,
-    //                         throughput
-    //                     );
-    //                 }
-
-    //                 last_logged_progress = Some(current_log); // update the last logged values
-    //             }
-
-    //             *last_processed_count.lock().unwrap() = now_processed;
-    //             last_time = now; // update the last time to current
-    //         }
-    //     });
-    // }
 
     // all this function does is reports the progress at the given time it is called
     pub fn report_progress(&self) {
@@ -192,11 +143,22 @@ impl ProgressTracker {
         };
 
         info!(
-            "{}: {:.2}% complete, ETA: {:.1} seconds, Throughput: {:.2} MB/sec",
+            "{}: {:.2}% complete, ETA: {:.1} seconds, Flushes: {:?}/{:?}, TPS: {:.2} MB/sec",
             *self.current_stage.lock().unwrap(),
             progress,
             eta,
+            self.expected_total_flushes,
+            self.expected_total_flushes,
             throughput
         );
+    }
+
+    pub fn increment_flushes(&self, count: usize) {
+        self.flushes_completed.fetch_add(count, Ordering::SeqCst);
+    }
+
+    pub fn set_expected_flushes(&self, flushes: usize) {
+        self.flushes_completed.store(0, Ordering::SeqCst);
+        self.expected_total_flushes.store(flushes, Ordering::SeqCst);
     }
 }

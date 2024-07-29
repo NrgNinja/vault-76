@@ -27,6 +27,7 @@ struct Record {
     hash: [u8; HASH_SIZE],
 }
 
+#[allow(unused_assignments)] // this is for expected_total_flushes not being read
 fn main() {
     // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault-76")
@@ -181,7 +182,7 @@ fn main() {
     let mut bucket_size = 0;
     let mut num_buckets = 0;
     let mut prefix_size = 0;
-    // let mut expected_total_flushes;
+    let mut expected_total_flushes;
     let mut sort_memory;
     // let mut sort_buckets = 0;
 
@@ -194,7 +195,7 @@ fn main() {
         num_buckets = 2usize.pow(prefix_size as u32);
         prefix_size = (f64::log(num_buckets as f64, 2.0)).ceil() as usize;
         bucket_size = file_size / num_buckets; // disk bucket size (in bytes)
-                                               // expected_total_flushes = file_size / write_size;
+        expected_total_flushes = file_size / write_size;
         sort_memory = bucket_size * num_threads;
 
         // valid configuration
@@ -207,7 +208,7 @@ fn main() {
             file_size = bucket_size * num_buckets;
             sort_memory = bucket_size * num_threads;
             num_records = file_size / RECORD_SIZE;
-            // expected_total_flushes = file_size / write_size;
+            expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
             // let sort_ratio = sort_memory / (bucket_size * RECORD_SIZE);
             // sort_buckets = num_buckets / sort_ratio;
@@ -228,10 +229,10 @@ fn main() {
                 write_size / 1024 / 1024
             ); // memory bucket size
             println!("Flush size: {}", flush_size); // how many times the flush happens
-            println!("Disk bucket size (in records): {}", bucket_size); // Records in 1 disk bucket
+            println!("Disk bucket size (in records): {}", bucket_size); // records in 1 disk bucket
             println!("Num buckets: {}", num_buckets);
             println!("Prefix size: {} bits", prefix_size);
-            // println!("Expected total flushes: {}", expected_total_flushes);
+            println!("Expected total flushes: {}", expected_total_flushes);
             println!(
                 "Sort memory: {} bytes ({} MB)",
                 sort_memory,
@@ -245,11 +246,14 @@ fn main() {
         write_size /= 2;
     }
 
+    let expected_flushes = file_size / write_size;
+
     info!("Opening Vault Entrance...");
 
     // initialize tracker to track progress of vault operations
     // tracker outputs progress every 2 seconds (you can reduce this, but more redundant output lines)
-    let tracker = ProgressTracker::new(num_records as u64, Duration::from_secs(2));
+    let tracker =
+        ProgressTracker::new(num_records as u64, expected_flushes, Duration::from_secs(2));
     let start_vault_timer = Instant::now();
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(num_buckets);
@@ -298,6 +302,8 @@ fn main() {
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
+        let flush_increment = map.len();
+        tracker.increment_flushes(flush_increment);
         map.clear();
     }
 
@@ -310,6 +316,8 @@ fn main() {
 
     if sorting_on {
         tracker.set_stage("[SORTING]");
+        tracker.set_expected_flushes(num_buckets);
+
         // let start_sorting = Instant::now();
 
         // creating an offset vector for sorting
@@ -327,6 +335,7 @@ fn main() {
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
             tracker.update_records_processed(records_per_bucket);
+            tracker.increment_flushes(1);
         });
 
         // sync the file and close it once done
