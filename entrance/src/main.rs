@@ -20,7 +20,7 @@ mod store_hashes;
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
 const NONCE_SIZE: usize = 6;
-const OUTPUT_FOLDER: &str = "output";
+const OUTPUT_FOLDER: &str = "../../output";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Record {
@@ -101,11 +101,11 @@ fn main() {
             )
         .get_matches();
 
+    let output_file = "output.bin";
+
     // determine if lookup is specified, otherwise continue normal vault operations
     if let Some(lookup_value) = matches.value_of("lookup") {
-        let filename = "output.bin";
-
-        if let Err(e) = lookup::lookup_by_prefix(filename, lookup_value) {
+        if let Err(e) = lookup::lookup_by_prefix(output_file, lookup_value) {
             eprintln!("Error during lookup: {}", e);
         }
         return;
@@ -149,8 +149,6 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid boolean for sorting_on");
 
-    let output_file = "output.bin";
-
     let verify = matches.is_present("verify");
 
     // libary to use multiple threads
@@ -180,7 +178,6 @@ fn main() {
     let mut prefix_size = 0;
     let mut expected_total_flushes;
     let mut sort_memory;
-    // let mut sort_buckets = 0;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {

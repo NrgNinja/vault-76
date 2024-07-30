@@ -12,7 +12,11 @@ pub fn flush_to_disk(
     offsets: &RwLock<Vec<usize>>,
 ) -> io::Result<()> {
     let path: PathBuf = PathBuf::from(OUTPUT_FOLDER).join(filename);
-    let file = OpenOptions::new().write(true).create(true).open(path).expect("Error opening file");
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(path)
+        .expect("Error opening file");
 
     let mut writer = BufWriter::new(&file);
     let mut offsets = offsets.write().unwrap(); // Acquire read lock on offsets
