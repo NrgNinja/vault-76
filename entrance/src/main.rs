@@ -298,8 +298,7 @@ fn main() {
         map.clear();
     }
 
-    let generation_writing_duration = start_generation_writing.elapsed();
-    let generation_duration_in_seconds = generation_writing_duration.as_secs_f64();
+    let generation_writing_duration = start_generation_writing.elapsed().as_secs_f64();
     // println!(
     //     "Generation & Writing took {:.2} seconds",
     //     generation_duration_in_seconds
@@ -354,8 +353,8 @@ fn main() {
     // let bytes_per_second = file_size as f64 / 1024.0 / 1024.0 / duration_in_seconds; // convert bytes to megabytes
 
     println!(
-        "{} {} {}",
-        generation_duration_in_seconds, sorting_duration, sync_duration
+        "{},{},{}",
+        generation_writing_duration, sorting_duration, sync_duration
     );
 
     // println!(
