@@ -1,14 +1,14 @@
 // this file holds the main driver of our vault codebase
-// use crate::progress_tracker::ProgressTracker;
+use crate::progress_tracker::ProgressTracker;
 use clap::{App, Arg};
 use dashmap::DashMap;
 use rand::random;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-// use spdlog::prelude::*;
+use spdlog::prelude::*;
 use std::f64;
 use std::sync::RwLock;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 mod hash_generator;
 mod hash_sorter;
@@ -99,6 +99,13 @@ fn main() {
                 .takes_value(true)
                 .help("Lookup a record by a prefix"),
             )
+        .arg(
+            Arg::with_name("debug")
+                .short('d')
+                .long("debug")
+                .takes_value(false)
+                .help("Prints debug information to the command line")
+            )
         .get_matches();
 
     let output_file = "output.bin";
@@ -149,6 +156,8 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid boolean for sorting_on");
 
+    let debug = matches.is_present("debug");
+
     let verify = matches.is_present("verify");
 
     // libary to use multiple threads
@@ -176,7 +185,7 @@ fn main() {
     let mut bucket_size = 0;
     let mut num_buckets = 0;
     let mut prefix_size = 0;
-    // let mut expected_total_flushes;
+    let mut expected_total_flushes;
     let mut sort_memory;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
@@ -188,12 +197,14 @@ fn main() {
         num_buckets = 2usize.pow(prefix_size as u32);
         prefix_size = (num_buckets as f64).log(2.0).ceil() as u32;
         bucket_size = file_size / num_buckets; // disk bucket size (in bytes)
-                                               // expected_total_flushes = file_size / write_size;
+        expected_total_flushes = file_size / write_size;
         sort_memory = bucket_size * num_threads;
 
         // valid configuration
         if sort_memory <= memory_size && num_buckets >= 64 {
-            // println!("-----------------Found valid config------------------");
+            if debug {
+                println!("-----------------Found valid config------------------");
+            }
             write_size = memory_size / num_buckets;
             write_size = (write_size / 16) * 16;
             bucket_size = write_size * flush_size;
@@ -201,35 +212,37 @@ fn main() {
             file_size = bucket_size * num_buckets;
             sort_memory = bucket_size * num_threads;
             num_records = file_size / RECORD_SIZE;
-            // expected_total_flushes = file_size / write_size;
+            expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
 
-            // println!(
-            //     "Memory size: {} bytes ({} GB)",
-            //     memory_size,
-            //     memory_size / 1024 / 1024 / 1024
-            // );
-            // println!(
-            //     "File size: {} bytes ({} GB)",
-            //     file_size,
-            //     file_size / 1024 / 1024 / 1024
-            // );
-            // println!(
-            //     "Write size [memory bucket size]: {} bytes ({} MB)",
-            //     write_size,
-            //     write_size / 1024 / 1024
-            // ); // memory bucket size
-            // println!("Flush size: {}", flush_size); // how many times the flush happens
-            // println!("Disk bucket size (in records): {}", bucket_size); // records in 1 disk bucket
-            // println!("Num buckets: {}", num_buckets);
-            // println!("Prefix size: {} bits", prefix_size);
-            // println!("Expected total flushes: {}", expected_total_flushes);
-            // println!(
-            //     "Sort memory: {} bytes ({} MB)",
-            //     sort_memory,
-            //     sort_memory / 1024 / 1024
-            // );
-            // println!("Number of records: {}", num_records);
+            if debug {
+                println!(
+                    "Memory size: {} bytes ({} GB)",
+                    memory_size,
+                    memory_size / 1024 / 1024 / 1024
+                );
+                println!(
+                    "File size: {} bytes ({} GB)",
+                    file_size,
+                    file_size / 1024 / 1024 / 1024
+                );
+                println!(
+                    "Write size [memory bucket size]: {} bytes ({} MB)",
+                    write_size,
+                    write_size / 1024 / 1024
+                ); // memory bucket size
+                println!("Flush size: {}", flush_size); // how many times the flush happens
+                println!("Disk bucket size (in records): {}", bucket_size); // records in 1 disk bucket
+                println!("Num buckets: {}", num_buckets);
+                println!("Prefix size: {} bits", prefix_size);
+                println!("Expected total flushes: {}", expected_total_flushes);
+                println!(
+                    "Sort memory: {} bytes ({} MB)",
+                    sort_memory,
+                    sort_memory / 1024 / 1024
+                );
+                println!("Number of records: {}", num_records);
+            }
 
             break;
         }
@@ -237,15 +250,17 @@ fn main() {
         write_size /= 2;
     }
 
-    // let expected_flushes = file_size / write_size;
+    let expected_flushes = file_size / write_size;
 
-    // info!("Opening Vault Entrance...");
-
+    if debug {
+        info!("Opening Vault Entrance...");
+    }
     // initialize tracker to track progress of vault operations
     // tracker outputs progress every 2 seconds (you can reduce this, but more redundant output lines)
-    // let tracker =
-    //     ProgressTracker::new(num_records as u64, expected_flushes, Duration::from_secs(2));
-    // let start_vault_timer = Instant::now();
+    let tracker =
+        ProgressTracker::new(num_records as u64, expected_flushes, Duration::from_secs(2));
+
+    let start_vault_timer = Instant::now();
 
     let map: DashMap<usize, Vec<Record>> = DashMap::with_capacity(num_buckets);
 
@@ -272,7 +287,9 @@ fn main() {
             let mut local_size = 0;
             let mut nonce: u64 = random();
 
-            // tracker.set_stage("[HASHGEN]");
+            if debug {
+                tracker.set_stage("[HASHGEN]");
+            }
             while local_size < thread_memory_limit {
                 let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize);
 
@@ -287,14 +304,19 @@ fn main() {
                 local_size += RECORD_SIZE;
             }
             // completed a batch of records processed
-            // tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+            if debug {
+                tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+            }
         });
 
         store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
-        // let flush_increment = map.len();
-        // tracker.increment_flushes(flush_increment);
+
+        if debug {
+            let flush_increment = map.len();
+            tracker.increment_flushes(flush_increment);
+        }
         map.clear();
     }
 
@@ -308,8 +330,10 @@ fn main() {
     let mut sync_duration = 0.0;
 
     if sorting_on {
-        // tracker.set_stage("[SORTING]");
-        // tracker.set_expected_flushes(num_buckets);
+        if debug {
+            tracker.set_stage("[SORTING]");
+            tracker.set_expected_flushes(num_buckets);
+        }
 
         let start_sorting = Instant::now();
 
@@ -322,13 +346,15 @@ fn main() {
 
         let path = format!("{}/{}", OUTPUT_FOLDER, output_file);
 
-        // let records_per_bucket = (num_records / num_buckets) as u64;
+        let records_per_bucket = (num_records / num_buckets) as u64;
 
         // parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
-            // tracker.update_records_processed(records_per_bucket);
-            // tracker.increment_flushes(1);
+            if debug {
+                tracker.update_records_processed(records_per_bucket);
+                tracker.increment_flushes(1);
+            }
         });
 
         sorting_duration = start_sorting.elapsed().as_secs_f64();
@@ -339,31 +365,42 @@ fn main() {
             .read(true)
             .open(&path)
             .expect("Error opening file");
-        // tracker.report_progress();
+        if debug {
+            tracker.report_progress();
+            tracker.set_stage("[SYNCING]");
+        }
         let sync_timer = Instant::now();
-        // tracker.set_stage("[SYNCING]");
         file.sync_data().expect("Error syncing data");
         sync_duration = sync_timer.elapsed().as_secs_f64();
         // println!("Syncing file took {:.2} seconds", sync_duration_in_seconds);
     }
 
-    // let duration = start_vault_timer.elapsed();
-    // let duration_in_seconds = duration.as_secs_f64();
-    // let hashes_per_second = num_records as f64 / duration_in_seconds / 1_000_000.0; // convert to MH/s
-    // let bytes_per_second = file_size as f64 / 1024.0 / 1024.0 / duration_in_seconds; // convert bytes to megabytes
+    let mut duration_in_seconds = 0.0;
+    let mut hashes_per_second = 0.0;
+    let mut bytes_per_second = 0.0;
+
+    if debug {
+        let duration = start_vault_timer.elapsed();
+        duration_in_seconds = duration.as_secs_f64();
+        hashes_per_second = num_records as f64 / duration_in_seconds / 1_000_000.0; // convert to MH/s
+        bytes_per_second = file_size as f64 / 1024.0 / 1024.0 / duration_in_seconds;
+        // convert bytes to megabytes
+    }
 
     println!(
         "{},{},{}",
         generation_writing_duration, sorting_duration, sync_duration
     );
 
-    // println!(
-    //     "Completed {} GB vault [output.bin] in {:.2} seconds: {:.2} MH/s {:.2} MB/s",
-    //     file_size / 1024 / 1024 / 1024,
-    //     duration_in_seconds,
-    //     hashes_per_second,
-    //     bytes_per_second
-    // );
+    if debug {
+        println!(
+            "Completed {} GB vault [output.bin] in {:.2} seconds: {:.2} MH/s {:.2} MB/s",
+            file_size / 1024 / 1024 / 1024,
+            duration_in_seconds,
+            hashes_per_second,
+            bytes_per_second
+        );
+    }
 
     if num_records_to_print != 0 {
         match print_records::print_records_from_file(num_records_to_print) {
