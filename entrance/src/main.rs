@@ -185,7 +185,7 @@ fn main() {
     let mut bucket_size = 0;
     let mut num_buckets = 0;
     let mut prefix_size = 0;
-    let mut expected_total_flushes;
+    let mut expected_total_flushes = 0;
     let mut sort_memory;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
@@ -250,8 +250,6 @@ fn main() {
         write_size /= 2;
     }
 
-    let expected_flushes = file_size / write_size;
-
     if debug {
         info!("Opening Vault Entrance...");
     }
@@ -262,7 +260,7 @@ fn main() {
     let tracker = if debug {
         Some(ProgressTracker::new(
             num_records as u64,
-            expected_flushes,
+            expected_total_flushes,
             Duration::from_secs(2),
         ))
     } else {
@@ -314,6 +312,7 @@ fn main() {
                 records.push(record);
                 local_size += RECORD_SIZE;
             }
+            println!("Finished while loop");
             // completed a batch of records processed
             if debug {
                 if let Some(ref tracker) = tracker {
