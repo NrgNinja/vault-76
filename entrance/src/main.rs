@@ -257,8 +257,17 @@ fn main() {
     }
     // initialize tracker to track progress of vault operations
     // tracker outputs progress every 2 seconds (you can reduce this, but more redundant output lines)
-    let tracker =
-        ProgressTracker::new(num_records as u64, expected_flushes, Duration::from_secs(2));
+
+    // Initialize tracker if debug is true
+    let tracker = if debug {
+        Some(ProgressTracker::new(
+            num_records as u64,
+            expected_flushes,
+            Duration::from_secs(2),
+        ))
+    } else {
+        None
+    };
 
     let start_vault_timer = Instant::now();
 
@@ -288,7 +297,9 @@ fn main() {
             let mut nonce: u64 = random();
 
             if debug {
-                tracker.set_stage("[HASHGEN]");
+                if let Some(ref tracker) = tracker {
+                    tracker.set_stage("[HASHGEN]");
+                }
             }
             while local_size < thread_memory_limit {
                 let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize);
@@ -305,7 +316,9 @@ fn main() {
             }
             // completed a batch of records processed
             if debug {
-                tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+                if let Some(ref tracker) = tracker {
+                    tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+                }
             }
         });
 
@@ -314,8 +327,10 @@ fn main() {
         total_generated += thread_memory_limit * num_threads;
 
         if debug {
-            let flush_increment = map.len();
-            tracker.increment_flushes(flush_increment);
+            if let Some(ref tracker) = tracker {
+                let flush_increment = map.len();
+                tracker.increment_flushes(flush_increment);
+            }
         }
         map.clear();
     }
@@ -331,8 +346,10 @@ fn main() {
 
     if sorting_on {
         if debug {
-            tracker.set_stage("[SORTING]");
-            tracker.set_expected_flushes(num_buckets);
+            if let Some(ref tracker) = tracker {
+                tracker.set_stage("[SORTING]");
+                tracker.set_expected_flushes(num_buckets);
+            }
         }
 
         let start_sorting = Instant::now();
@@ -352,8 +369,10 @@ fn main() {
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
             hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
             if debug {
-                tracker.update_records_processed(records_per_bucket);
-                tracker.increment_flushes(1);
+                if let Some(ref tracker) = tracker {
+                    tracker.update_records_processed(records_per_bucket);
+                    tracker.increment_flushes(1);
+                }
             }
         });
 
@@ -366,8 +385,10 @@ fn main() {
             .open(&path)
             .expect("Error opening file");
         if debug {
-            tracker.report_progress();
-            tracker.set_stage("[SYNCING]");
+            if let Some(ref tracker) = tracker {
+                tracker.report_progress();
+                tracker.set_stage("[SYNCING]");
+            }
         }
         let sync_timer = Instant::now();
         file.sync_data().expect("Error syncing data");
