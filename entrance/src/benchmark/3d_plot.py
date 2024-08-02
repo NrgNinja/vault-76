@@ -5,7 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
 
 # Load the data
-data = pd.read_csv('vault_csv/vault76_k25_sata_no12.csv')
+data = pd.read_csv('vault_csv/vault76_k25_athenaHDD.csv')
 
 # Clean the data: Remove rows with missing or non-numeric values in 'hash_time' and 'sort_time'
 data = data.dropna()
@@ -65,4 +65,4 @@ plt.tight_layout()
 # plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
 plt.show()
 
-plt.savefig(f"vault_plot/vault76_k25_sata_no12.svg")
+plt.savefig(f"vault_plot/vault76_k25_athenaHDD.svg")
