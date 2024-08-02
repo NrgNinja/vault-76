@@ -5,7 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
 
 # Load the data
-data = pd.read_csv('vault_csv/vault_k25.csv')
+data = pd.read_csv('vault_csv/vault_k25_nvme.csv')
 
 # Clean the data: Remove rows with missing or non-numeric values in 'hash_time' and 'sort_time'
 data = data.dropna()
@@ -15,6 +15,7 @@ data = data[pd.to_numeric(data['sort_time'], errors='coerce').notnull()]
 # Convert columns to numeric
 data['threads'] = data['threads'].astype(int)
 data['memory'] = data['memory'].astype(int)
+data['memory'] = data['memory']
 data['hash_time'] = data['hash_time'].astype(float)
 data['sort_time'] = data['sort_time'].astype(float)
 
