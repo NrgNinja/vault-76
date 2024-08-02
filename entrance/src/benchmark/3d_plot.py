@@ -5,21 +5,24 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import griddata
 
 # Load the data
-data = pd.read_csv('vault_csv/vault_k25.csv')
+data = pd.read_csv('vault_csv/vault76_k25_sata_no12.csv')
 
 # Clean the data: Remove rows with missing or non-numeric values in 'hash_time' and 'sort_time'
 data = data.dropna()
 data = data[pd.to_numeric(data['hash_time'], errors='coerce').notnull()]
 data = data[pd.to_numeric(data['sort_time'], errors='coerce').notnull()]
+data = data[pd.to_numeric(data['sync_time'], errors='coerce').notnull()]
 
 # Convert columns to numeric
 data['threads'] = data['threads'].astype(int)
 data['memory'] = data['memory'].astype(int)
+data['memory'] = data['memory'] / 1024 / 1024  # Convert memory to MB
 data['hash_time'] = data['hash_time'].astype(float)
 data['sort_time'] = data['sort_time'].astype(float)
+data['sync_time'] = data['sync_time'].astype(float)
 
 # Calculate the sum of hash_time and sort_time
-data['total_time'] = data['hash_time'] + data['sort_time']
+data['total_time'] = data['hash_time'] + data['sort_time'] + data['sync_time']
 
 # Get unique ticks from data
 # threads_ticks = np.sort(data['threads'].unique())
@@ -62,4 +65,4 @@ plt.tight_layout()
 # plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
 plt.show()
 
-plt.savefig(f"vault_plot/vault_k25.svg")
+plt.savefig(f"vault_plot/vault76_k25_sata_no12.svg")
