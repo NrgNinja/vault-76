@@ -5,7 +5,7 @@ num_threads=1
 max_num_threads=32 #6 runs
 #pi
 #max_num_threads=4 #3 runs
-memory=$((1024 * 1024))            #1MB
+memory=$((1024 * 1024 * 4))            #4MB (excluded 1 and 2)
 max_memory=$((1024 * 1024 * 1024)) # 1GB #11 runs
 k=25
 output_dir="../../output"

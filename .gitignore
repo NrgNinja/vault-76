@@ -9,3 +9,4 @@ entrance/out.folded
 entrance/out.perf
 entrance/perf.data
 FlameGraph
+.venv
