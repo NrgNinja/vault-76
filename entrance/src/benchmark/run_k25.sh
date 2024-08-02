@@ -9,7 +9,7 @@ memory=$((1024 * 1024 * 4))            #4MB (excluded 1 and 2)
 max_memory=$((1024 * 1024 * 1024)) # 1GB #11 runs
 k=25
 output_dir="../../output"
-csv_file="vault_csv/vault76_k${k}_nvme.csv"
+csv_file="vault_csv/vault76_k${k}_athenaHDD.csv"
 
 echo "threads,memory,hash_time,sort_time,sync_time" >"$csv_file"
 
