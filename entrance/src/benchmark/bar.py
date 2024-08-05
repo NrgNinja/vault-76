@@ -8,6 +8,8 @@ def strip_last(time):
     elif time[-1:] == "s":
         time = float(time[:-1])
         return time
+    
+machine_name = "torus"
 
 for k in range(25, 31):
     threads = [1, 2, 4, 8, 16]
@@ -43,4 +45,4 @@ for k in range(25, 31):
         plt.text(i + bar_width / 2, avg_write_time + 0.05, f'{avg_write_time}', ha="center", va="bottom")
 
     plt.legend()
-    plt.savefig(f"gen_sort_plot/vault_{k}.svg")
+    plt.savefig(f"vault_plot/vault_{machine_name}_{k}.svg")
