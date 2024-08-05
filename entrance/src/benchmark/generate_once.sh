@@ -19,7 +19,7 @@ sudo sync
 sar -r 1 >../../stats/memory/memory-stats_$k$threads.txt &
 sleep 5
 
-./../../target/release/entrance -k $k -t $threads -s true -m $memory
+./../../target/release/entrance -k $k -t $threads -s true -m $memory -d
 # 17179869184
 # 2147483648
 # dd if=/dev/urandom of=newfile bs=1M count=1024
