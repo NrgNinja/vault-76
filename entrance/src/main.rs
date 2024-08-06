@@ -312,7 +312,7 @@ fn main() {
                 records.push(record);
                 local_size += RECORD_SIZE;
             }
-            println!("Finished while loop");
+            // println!("Finished while loop");
             // completed a batch of records processed
             if debug {
                 if let Some(ref tracker) = tracker {
