@@ -20,7 +20,7 @@ mod store_hashes;
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 const HASH_SIZE: usize = 26;
 const NONCE_SIZE: usize = 6;
-const OUTPUT_FOLDER: &str = "output";
+const OUTPUT_FOLDER: &str = "../../output";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Record {
@@ -101,11 +101,11 @@ fn main() {
             )
         .get_matches();
 
+    let output_file = "output.bin";
+
     // determine if lookup is specified, otherwise continue normal vault operations
     if let Some(lookup_value) = matches.value_of("lookup") {
-        let filename = "output.bin";
-
-        if let Err(e) = lookup::lookup_by_prefix(filename, lookup_value) {
+        if let Err(e) = lookup::lookup_by_prefix(output_file, lookup_value) {
             eprintln!("Error during lookup: {}", e);
         }
         return;
@@ -149,8 +149,6 @@ fn main() {
         .parse::<bool>()
         .expect("Please provide a valid boolean for sorting_on");
 
-    let output_file = "output.bin";
-
     let verify = matches.is_present("verify");
 
     // libary to use multiple threads
@@ -174,13 +172,12 @@ fn main() {
 
     let ratio = ((file_size as f64) / (memory_size as f64)).ceil() as usize;
     let mut write_size = 1024 * 1024 / ratio;
-    let mut flush_size;
+    let mut flush_size = 0;
     let mut bucket_size = 0;
     let mut num_buckets = 0;
     let mut prefix_size = 0;
-    let mut expected_total_flushes;
-    let mut sort_memory;
-    // let mut sort_buckets = 0;
+    let mut expected_total_flushes = 0;
+    let mut sort_memory = 0;
 
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {
@@ -196,7 +193,7 @@ fn main() {
 
         // valid configuration
         if sort_memory <= memory_size && num_buckets >= 64 {
-            println!("-----------------Found valid config------------------");
+            // println!("-----------------Found valid config------------------");
             write_size = memory_size / num_buckets;
             write_size = (write_size / 16) * 16;
             bucket_size = write_size * flush_size;
@@ -206,33 +203,6 @@ fn main() {
             num_records = file_size / RECORD_SIZE;
             expected_total_flushes = file_size / write_size;
             bucket_size = write_size * flush_size / RECORD_SIZE;
-
-            println!(
-                "Memory size: {} bytes ({} GB)",
-                memory_size,
-                memory_size / 1024 / 1024 / 1024
-            );
-            println!(
-                "File size: {} bytes ({} GB)",
-                file_size,
-                file_size / 1024 / 1024 / 1024
-            );
-            println!(
-                "Write size [memory bucket size]: {} bytes ({} MB)",
-                write_size,
-                write_size / 1024 / 1024
-            ); // memory bucket size
-            println!("Flush size: {}", flush_size); // how many times the flush happens
-            println!("Disk bucket size (in records): {}", bucket_size); // records in 1 disk bucket
-            println!("Num buckets: {}", num_buckets);
-            println!("Prefix size: {} bits", prefix_size);
-            println!("Expected total flushes: {}", expected_total_flushes);
-            println!(
-                "Sort memory: {} bytes ({} MB)",
-                sort_memory,
-                sort_memory / 1024 / 1024
-            );
-            println!("Number of records: {}", num_records);
 
             break;
         }
@@ -301,12 +271,14 @@ fn main() {
         map.clear();
     }
 
-    // let generation_writing_duration = start_generation_writing.elapsed();
-    // let generation_duration_in_seconds = generation_writing_duration.as_secs_f64();
+    // let generation_writing_duration = start_generation_writing.elapsed().as_secs_f64();
     // println!(
     //     "Generation & Writing took {:.2} seconds",
     //     generation_duration_in_seconds
     // );
+
+    // let mut sorting_duration = 0.0;
+    // let mut sync_duration = 0.0;
 
     if sorting_on {
         tracker.set_stage("[SORTING]");
@@ -321,7 +293,7 @@ fn main() {
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
-        let path = format!("output/{}", output_file);
+        let path = format!("{}/{}", OUTPUT_FOLDER, output_file);
 
         let records_per_bucket = (num_records / num_buckets) as u64;
 
@@ -332,6 +304,9 @@ fn main() {
             tracker.increment_flushes(1);
         });
 
+        // sorting_duration = start_sorting.elapsed().as_secs_f64();
+        // println!("Sorting took {:.2} seconds", sorting_duration_in_seconds);
+
         // sync the file and close it once done
         let file = std::fs::OpenOptions::new()
             .read(true)
@@ -341,19 +316,19 @@ fn main() {
         let sync_timer = Instant::now();
         tracker.set_stage("[SYNCING]");
         file.sync_data().expect("Error syncing data");
-        let sync_duration = sync_timer.elapsed();
-        let sync_duration_in_seconds = sync_duration.as_secs_f64();
+        let sync_duration_in_seconds = sync_timer.elapsed().as_secs_f64();
         println!("Syncing file took {:.2} seconds", sync_duration_in_seconds);
-
-        // let sorting_duration = start_sorting.elapsed();
-        // let sorting_duration_in_seconds = sorting_duration.as_secs_f64();
-        // println!("Sorting took {:.2} seconds", sorting_duration_in_seconds);
     }
 
     let duration = start_vault_timer.elapsed();
     let duration_in_seconds = duration.as_secs_f64();
     let hashes_per_second = num_records as f64 / duration_in_seconds / 1_000_000.0; // convert to MH/s
     let bytes_per_second = file_size as f64 / 1024.0 / 1024.0 / duration_in_seconds; // convert bytes to megabytes
+
+    // println!(
+    //     "{},{},{}",
+    //     generation_writing_duration, sorting_duration, sync_duration
+    // );
 
     println!(
         "Completed {} GB vault [output.bin] in {:.2} seconds: {:.2} MH/s {:.2} MB/s",

@@ -5,10 +5,11 @@ output_dir="../../output"
 
 k="$1"
 threads="$2"
+memory="$3" 
 
-echo "Gen&Sort,Writing" >"vault_$k"_"$threads"t".csv"
+echo "Gen&Flush,Sort,Sync" >"gen_sort_csv/vault76_torus_$k"_"$threads"t".csv"
 
-for n in {1..10}; do
+for n in {1..5}; do
     # Clean the output directory
     rm -rf "${output_dir:?}"/*
 
@@ -17,7 +18,5 @@ for n in {1..10}; do
     sleep 5
 
     # Capture the output of the program
-    ./../../target/release/entrance -k $k -t $threads -f output.bin >>"vault_$k"_"$threads"t".csv"
+    ./../../target/release/entrance -k $k -t $threads -m $memory >>"gen_sort_csv/vault76_torus_$k"_"$threads"t".csv"
 done
-
-mv "vault_$k"_"$threads"t".csv" gen_sort_csv/
