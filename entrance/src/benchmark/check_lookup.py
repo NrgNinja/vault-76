@@ -11,8 +11,16 @@ filename = sys.argv[1]
 # Load the CSV file
 data = pd.read_csv(filename)
 
-# Remove 'ms' from the LookupTime column and convert to float
-data['LookupTime(ms)'] = data['LookupTime(ms)'].str.replace('ms', '').astype(float)
+# Normalize 'LookupTime' to milliseconds
+def normalize_time(time_str):
+    if 'µs' in time_str:
+        # Convert microseconds to milliseconds
+        return float(time_str.replace('µs', '')) / 1000
+    else:
+        # Remove 'ms' and convert
+        return float(time_str.replace('ms', ''))
+
+data['LookupTime(ms)'] = data['LookupTime(ms)'].apply(normalize_time)
 
 # Filter the data into found and not found
 found_data = data[data['IsExist'] == True]
