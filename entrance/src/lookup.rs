@@ -13,10 +13,10 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
-    println!("{:?}", reader.capacity());
+    // println!("{:?}", reader.capacity());
 
     let total_size = reader.seek(SeekFrom::End(0))? as usize;
-    println!("Total size: {}", total_size);
+    // println!("Total size: {}", total_size);
     let num_records = total_size / RECORD_SIZE;
 
     let start_time = Instant::now();
