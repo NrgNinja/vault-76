@@ -26,7 +26,7 @@ for k in {25..30}; do
     done
 done
 
-for n in {1..10}; do
+for n in {1..5}; do
     # Clean the output directory
     rm -rf "${output_dir:?}"/*
 
@@ -35,5 +35,6 @@ for n in {1..10}; do
     sleep 1
 
     # Capture the output of the program
+
     ./../../target/release/entrance -k $k -t $threads -m $memory >>"vault_csv/vault76_eightsocket_$k"_"$threads"t".csv"
 done

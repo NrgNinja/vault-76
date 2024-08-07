@@ -5,10 +5,10 @@ num_threads=1
 max_num_threads=16 #6 runs
 #pi
 #max_num_threads=4 #3 runs
-memory=$((1024 * 1024 * 128))            #4MB (excluded 1 and 2)
-max_memory=$((1024 * 1024 * 1024 * 64)) # 1GB #11 runs
+memory=$((1024 * 1024 * 512))            #4MB (excluded 1 and 2)
+max_memory=$((1024 * 1024 * 1024 * 128)) # 1GB #11 runs
 k=32
-t=16
+t=128
 output_dir="../../output"
 csv_file="vault_csv/vault76_k${k}_torus.csv"
 
