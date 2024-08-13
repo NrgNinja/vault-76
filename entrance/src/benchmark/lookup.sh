@@ -2,22 +2,40 @@
 
 k=$1
 hash_len=$2
-total_duration=0
-
-# generate file
 output_dir="../../output"
+csv_file="lookup_csv/lookup_${k}_${hash_len}.csv"
+
+# Clear output directory and create CSV headers
 rm -rf "${output_dir:?}"/*
-./../../target/release/entrance -k $k -t 16 -f output.bin
+echo "LookupTime(ms),IsExist" > "$csv_file"
 
-# add headings
-echo "HashPrefix,LookupTime(ms),IsExist" >lookup_$k"_"$hash_len.csv
+# Generate file
+./../../target/release/entrance -k "$k" -t 16
 
-# run lookup
+# Run lookup for 1000 random prefixes
 for i in {1..1000}; do
-    # clean cache
+    # Clear cache
     free >/dev/null && sync >/dev/null && sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches' && free >/dev/null
-    hash=$(python3 get_hash.py $i $hash_len)
-    ./../../target/release/entrance -l $hash -f output.bin >>lookup_$k"_"$hash_len.csv
+
+    # Get a random hash prefix
+    hash=$(python3 get_hash.py "$i" "$hash_len")
+
+    # Capture the output of the lookup
+    output=$(./../../target/release/entrance -l "$hash")
+
+    # Determine if records were found
+    if [[ "$output" == *"No records found"* ]]; then
+        is_exist="false"
+    else
+        is_exist="true"
+    fi
+
+    # Extract lookup time from output
+    lookup_time=$(echo "$output" | grep -oP 'Search duration: \K[^\s]*')
+
+    # Write to CSV
+    echo "${lookup_time}${is_exist}" >> "$csv_file"
 done
 
-mv lookup_$k"_"$hash_len.csv lookup_csv/
+# Call Python script to analyze the CSV file
+python3 check_lookup.py "$csv_file"
