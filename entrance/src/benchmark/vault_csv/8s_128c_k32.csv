@@ -1,0 +1,13 @@
+Program,Drive,Throughput
+vault-76,NVMe,267.9
+vault-76,SSD,89.5
+vault,NVMe,101.8
+vault,SSD,74.2
+chiaPoS,NVMe,4.4
+chiaPoS,SSD,4.4
+madmax,NVMe,42.6
+madmax,SSD,42.0
+bladebit,NVMe,60.4
+bladebit,SSD,59.4
+nossd,NVMe,71.0
+nossd,SSD,16.1

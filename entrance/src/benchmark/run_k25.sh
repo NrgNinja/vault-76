@@ -8,7 +8,6 @@ max_num_threads=32 #6 runs
 memory=$((1024 * 1024 * 4))            #4MB (excluded 1 and 2)
 max_memory=$((1024 * 1024 * 1024)) # 1GB #11 runs
 k=27
-k=27
 output_dir="../../output"
 csv_file="vault_csv/vault76_k${k}_torusSATA.csv"
 
