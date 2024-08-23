@@ -1,7 +1,7 @@
 # Vault 76
 ## Purpose
 
-This holds the new implementation, written in Rust, of the OG vault which was entirely written in C. The new vault, it being the 76th iteration, will generate records using the BLAKE3 hashing function by taking in a unique nonce. Each record contains a 6-byte nonce & a 26-byte hash, which equates to a total record of 32 bytes. Once generated, the hashes will be saved in memory to a vector (dynamic array). Then, they can be sorted in sequential order, and finally written to disk on a binary output file. You can then look up the hashes from the binary file by deserializing it. This is a multi-threaded implementation using the data parallelism library, Rayon. More details to be added.
+This repo contains a new approach, written in Rust, of a tool to further improve Proof-of-Space consensus algorithm for blockchain systems. This was based on the original ([Vault](https://github.com/udig-v/vault)),  which was entirely written in C. The new implementation, Vault-76, will generate records using the BLAKE3 hashing function by taking in a unique & random nonce. Each record contains a 6-byte nonce & a 26-byte hash, which equates to a total record of 32 bytes. Once generated, the hashes will be saved in memory to a DashMap, which is a HashMap that supports concurrency. Then, they are sorted and written to disk to a binary output file. You can then look up the hashes from the binary file by deserializing it. This is a multi-threaded implementation using the data parallelism library, Rayon. Our solution currently has higher throughput and lower latency compared to state-of-the-art [Chia plotters](https://docs.chia.net/plotting-software/).
 
 [Logo](https://drive.google.com/file/d/13utk5G9_SNyEJShodPVpur2Xc5J6A6EU/view?usp=sharing)
 
@@ -47,7 +47,7 @@ cargo build --release
 ```
 6. To run the vault, use this:
 Here are some default settings:
-* *output file: `none` (if not specified)*
+* *output file: `output.bin`*
 * *number of threads to use: `1`*
 * *number of hashes to generate: `1`* 
 * *number of records to print to command line: `0`*
@@ -59,16 +59,21 @@ Make sure to include `--` after `--release`, if you plan on using more flags.
 
 ### Example:
 ```bash
-cargo run --release -- -k 25 -t 8 -f output.bin -p 10
+cargo run --release -- -k 25 -t 8 -p 10
 ```
-*This runs vault operations with `8` threads and generates 2^k records, where k is `25` (so 33554432  records). Sorting is on (`true`) by default, and will be written to the output file specified `output.bin`. Finally, `10` records will be printed to the command line.*
+*This runs vault operations with `8` threads and generates 2^k records, where k is `25` (so 33,554,432  records). Sorting is on (`true`) by default, and will be written to the output file `output.bin`. Finally, `10` records will be printed to the command line.*
 
-6. To see what flags can be customized:
+6. To run the program in debug mode, make sure to include the *-b* flag:
+```bash
+cargo run --release -- -k 25 -t 8 -b
+```
+
+7. To see what flags can be customized:
 ```bash
 cargo run --release -- -h
 ```
 
-7. To clean wipe your build:
+8. To clean wipe your build:
 
 *Be sure to remove generated files every once in a while to clean cache and start fresh in case of any issues*
 ```bash
@@ -113,16 +118,10 @@ The script first cleans cache, then runs release build with specified parameters
 ### Postcard
 [Postcard is a #![no_std] focused serializer and deserializer for Serde..](https://docs.rs/postcard/latest/postcard/)
 
-## Known Bugs
-* The generation of hashes and storing them into a dashmap is a consistent ~2-3 seconds depending on your system and thread count. There doesn't seem to be a way to make this faster at the moment.
-* Writing to disk using a sparse file from a DashMap is a consistent ~1 second, is there any way to make this under a second?
-
-## TODO:
+## Future Work Considerations:
 * keep README up to date 
 * implement caching layer with NVMe + HDD solutions
 * explore lossy/lossless compression techniques
-* be awesome
-* be cool
 
 ## About the Authors:
 * [Varvara Bondarenko](varvara.bondarenko14@gmail.com) 
