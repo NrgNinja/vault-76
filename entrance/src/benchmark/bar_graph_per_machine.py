@@ -2,10 +2,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-file_name = 'pi_4c'
+file_name = 'epycbox_64c'
 file_path = 'vault_csv/' + file_name + '.csv'
 
 df = pd.read_csv(file_path)
+
+df['Throughput'] = df['Throughput'].fillna(0)
 
 # Get unique drives and programs
 drives = df['Drive'].unique()
@@ -35,22 +37,22 @@ for ax, drive in zip(axes, drives):
     for i, program in enumerate(programs):
         program_df = drive_df[drive_df['Program'] == program]
         bars = ax.bar(bar_positions + i * (bar_width + bar_spacing), program_df['Throughput'], 
-                      width=bar_width, color=colors[i], label=program)
+                      width=bar_width, color=colors[i], label=program, edgecolor='black')
 
         # Add throughput labels on each bar
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width() / 2., height, f'{height:.1f}', 
-                    ha='center', va='bottom', fontsize=9, rotation=30)
+        # for bar in bars:
+        #     height = bar.get_height()
+        #     ax.text(bar.get_x() + bar.get_width() / 2., height, f'{height:.1f}', 
+        #             ha='center', va='bottom', fontsize=9, rotation=30)
 
     ax.set_title(f'{drive}')
     ax.set_xlabel('k')
-    ax.set_ylabel('Throughput, MB/s')
+    ax.set_ylabel('Throughput (MB/s)')
     ax.set_xticks(bar_positions + (len(programs) - 1) * (bar_width + bar_spacing) / 2)
     ax.set_xticklabels(k_values)
     ax.legend(title='Program', loc='upper right')
     
-fig.text(0.5, 0.02, 'Raspberry Pi, 4 threads', ha='center', va='center', fontsize=12, fontweight='bold')
+fig.text(0.5, 0.01, 'Epycbox, 64 threads', ha='center', va='center', fontsize=12, fontweight='bold')
 
 plt.tight_layout(rect=[0, 0, 1, 1])
 
