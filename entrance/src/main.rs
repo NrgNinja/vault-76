@@ -174,10 +174,12 @@ fn main() {
         .num_threads(num_threads)
         .build_global()
         .unwrap();
+    
+    let record_size = NONCE_SIZE + hash_size;
 
     // if -f flag is not provided, calculate file size based on k value
     if file_size == 0 {
-        file_size = num_records * RECORD_SIZE;
+        file_size = num_records * record_size;
         // in bytes
     }
 
@@ -223,9 +225,9 @@ fn main() {
             memory_size = write_size * num_buckets;
             file_size = bucket_size * num_buckets;
             sort_memory = bucket_size * num_threads;
-            num_records = file_size / RECORD_SIZE;
+            num_records = file_size / record_size;
             expected_total_flushes = file_size / write_size;
-            bucket_size = write_size * flush_size / RECORD_SIZE;
+            bucket_size = write_size * flush_size / record_size;
 
             if debug {
                 println!(
@@ -294,7 +296,7 @@ fn main() {
     // defining offset vector for the generation phase
     let mut offsets = vec![0; num_buckets];
     for i in 1..num_buckets {
-        offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
+        offsets[i] = offsets[i - 1] + bucket_size * record_size;
     }
     let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 
@@ -322,17 +324,17 @@ fn main() {
                     continue;
                 }
                 records.push(record);
-                local_size += RECORD_SIZE;
+                local_size += record_size;
             }
             // completed a batch of records processed
             if debug {
                 if let Some(ref tracker) = tracker {
-                    tracker.update_records_processed((local_size / RECORD_SIZE) as u64);
+                    tracker.update_records_processed((local_size / record_size) as u64);
                 }
             }
         });
 
-        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector)
+        store_hashes::flush_to_disk(&map, &output_file, &offsets_vector, record_size)
             .expect("Error flushing to disk");
         total_generated += thread_memory_limit * num_threads;
 
@@ -367,7 +369,7 @@ fn main() {
         // creating an offset vector for sorting
         let mut offsets = vec![0; num_buckets];
         for i in 1..num_buckets {
-            offsets[i] = offsets[i - 1] + bucket_size * RECORD_SIZE;
+            offsets[i] = offsets[i - 1] + bucket_size * record_size;
         }
         let offsets_vector: RwLock<Vec<usize>> = RwLock::new(offsets);
 

@@ -1,5 +1,5 @@
 // this file writes the hashes to disk using multiple threads
-use crate::{Record, OUTPUT_FOLDER, RECORD_SIZE};
+use crate::{Record, OUTPUT_FOLDER};
 use dashmap::DashMap;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
@@ -10,6 +10,7 @@ pub fn flush_to_disk(
     records: &DashMap<usize, Vec<Record>>,
     filename: &str,
     offsets: &RwLock<Vec<usize>>,
+    record_size: usize
 ) -> io::Result<()> {
     let path: PathBuf = PathBuf::from(OUTPUT_FOLDER).join(filename);
     let file = OpenOptions::new()
@@ -33,11 +34,11 @@ pub fn flush_to_disk(
             // println!("Offsets vector before changing: {:?}", offsets[*prefix]);
             writer.write_all(&record.nonce)?;
             writer.write_all(&record.hash)?;
-            offsets[*prefix] += RECORD_SIZE; // Update offset after writing
+            offsets[*prefix] += record_size; // Update offset after writing
                                              // println!("Offsets vector: {:?}", offsets[*prefix]);
         }
         // Update the offset for this bucket after writing all records
-        offsets[*prefix] = offset + records.len() * RECORD_SIZE; // Increment by the number of bytes written
+        offsets[*prefix] = offset + records.len() * record_size; // Increment by the number of bytes written
     }
 
     writer.flush()?;
