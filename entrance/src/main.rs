@@ -25,7 +25,7 @@ const OUTPUT_FOLDER: &str = "../../output";
 #[derive(Debug, Serialize, Deserialize)]
 struct Record {
     nonce: [u8; NONCE_SIZE], // nonce is always 6 bytes in size & unique; represented by an array of u8 6 elements
-    hash: [u8; HASH_SIZE],
+    hash: Vec<u8>,
 }
 
 #[allow(unused_assignments)] // this is for expected_total_flushes not being read
@@ -47,13 +47,6 @@ fn main() {
                 .long("print")
                 .takes_value(true)
                 .help("Number of records to print"),
-        )
-        .arg(
-            Arg::with_name("sorting_on")
-                .short('s')
-                .long("sorting_on")
-                .takes_value(true)
-                .help("Turn sorting on/off"),
         )
         .arg(
             Arg::with_name("threads")
@@ -91,6 +84,13 @@ fn main() {
                 .long("verify")
                 .takes_value(false)  // automatically true if used, false otherwise
                 .help("Verify that the hashes in the output file are in sorted order"),
+        )
+        .arg(
+            Arg::with_name("sorting_on")
+                .short('s')
+                .long("sorting_on")
+                .takes_value(false)
+                .help("Turn sorting on/off"),
         )
         .arg(
             Arg::with_name("lookup")
@@ -157,15 +157,17 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for file_size");
 
-    let sorting_on = matches
-        .value_of("sorting_on")
-        .unwrap_or("true")
-        .parse::<bool>()
-        .expect("Please provide a valid boolean for sorting_on");
+    let sorting_on = matches.is_present("sorting_on");
 
     let debug = matches.is_present("debug");
 
     let verify = matches.is_present("verify");
+
+    let hash_size = matches
+        .value_of("hash_size")
+        .unwrap_or("26")
+        .parse::<usize>()
+        .expect("Please provide a valid number for hash_size");
 
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
@@ -307,7 +309,7 @@ fn main() {
                 }
             }
             while local_size < thread_memory_limit {
-                let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize);
+                let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize, hash_size);
 
                 nonce += 1;
 

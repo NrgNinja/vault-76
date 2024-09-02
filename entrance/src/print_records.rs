@@ -5,12 +5,12 @@ use std::fs::File;
 use std::io::{self, BufReader};
 
 // converts nonce from byte array to a decimal value
-fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
+pub fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
     nonce.iter().fold(0u64, |acc, &b| acc * 256 + b as u64)
 }
 
 // converts hash from byte array to a hexadecimal string
-fn hash_to_string(hash: &[u8; HASH_SIZE]) -> String {
+pub fn hash_to_string(hash: &Vec<u8>) -> String {
     hash.iter()
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<String>>()

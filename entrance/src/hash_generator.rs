@@ -1,11 +1,11 @@
 // // this file stores the hash generation process of the vault
-use crate::{Record, HASH_SIZE};
+use crate::Record;
 use blake3::Hasher;
 use std::convert::TryInto;
 
 // this method uses prefix extraction & returns the hash with its prefix for storage in DashMap
 #[inline]
-pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
+pub fn generate_hash(nonce: u64, prefix_length: usize, hash_size: usize) -> (u64, Record) {
     // convert the nonce and hash to byte arrays (6 and 26 respectively)
     let nonce_bytes = nonce.to_be_bytes();
     let mut hasher = Hasher::new();
@@ -35,7 +35,7 @@ pub fn generate_hash(nonce: u64, prefix_length: usize) -> (u64, Record) {
         prefix,
         Record {
             nonce: nonce_bytes[2..8].try_into().unwrap(),
-            hash: hash_bytes[0..HASH_SIZE].try_into().unwrap(),
+            hash: hash_bytes[0..hash_size].try_into().unwrap(),
         },
     )
 }

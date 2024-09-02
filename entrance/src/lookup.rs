@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::time::Instant;
+use crate::print_records::{hash_to_string, nonce_to_decimal};
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 
@@ -119,17 +120,6 @@ fn collect_records<R: Read + Seek>(
         current += if forward { 1 } else { -1 };
     }
     Ok(())
-}
-
-fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
-    nonce.iter().fold(0u64, |acc, &b| acc * 256 + b as u64)
-}
-
-fn hash_to_string(hash: &[u8; 26]) -> String {
-    hash.iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<String>>()
-        .join("")
 }
 
 fn deserialize_next_record<R: Read>(reader: &mut R) -> io::Result<Option<Record>> {
