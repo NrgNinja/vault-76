@@ -106,6 +106,13 @@ fn main() {
                 .takes_value(false)
                 .help("Prints debug information to the command line")
             )
+        .arg(
+            Arg::with_name("hash_size")
+                .short('h')
+                .long("hash_size")
+                .takes_value(true)
+                .help("Specify the size of the hash"),
+        )
         .get_matches();
 
     let output_file = "output.bin";
