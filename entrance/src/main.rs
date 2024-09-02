@@ -65,11 +65,11 @@ fn main() {
                 .help("File size to be populated with hashes"),
         )
         .arg(
-            Arg::with_name("memory_limit")
+            Arg::with_name("memory_size")
                 .short('m')
-                .long("memory_limit")
+                .long("memory_size")
                 .takes_value(true)
-                .help("How much memory you want to limit for the vault to use"),
+                .help("How much memory you want to limit for the vault to use (in MB)"),
         )
         .arg(
             Arg::with_name("prefix_length")
@@ -146,10 +146,10 @@ fn main() {
         .expect("Please provide a valid number of records to print");
 
     let mut memory_size = matches
-        .value_of("memory_limit")
-        .unwrap_or("2147483648")
+        .value_of("memory_size")
+        .unwrap_or("2048") // 2048 MB or 2 GB 
         .parse::<usize>()
-        .expect("Please provide a valid number for memory_limit");
+        .expect("Please provide a valid number for memory_size");
 
     let mut file_size = matches
         .value_of("file_size")
@@ -180,6 +180,9 @@ fn main() {
         file_size = num_records * RECORD_SIZE;
         // in bytes
     }
+
+    // convert memory_size into bytes
+    memory_size = memory_size * 1024 * 1024; 
 
     // if memory_size is bigger than the file size of the hashes, set memory_size to file_size
     memory_size = if memory_size > file_size {
