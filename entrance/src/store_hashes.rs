@@ -10,7 +10,7 @@ pub fn flush_to_disk(
     records: &DashMap<usize, Vec<Record>>,
     filename: &str,
     offsets: &RwLock<Vec<usize>>,
-    record_size: usize
+    record_size: usize,
 ) -> io::Result<()> {
     let path: PathBuf = PathBuf::from(OUTPUT_FOLDER).join(filename);
     let file = OpenOptions::new()
@@ -40,7 +40,6 @@ pub fn flush_to_disk(
         // Update the offset for this bucket after writing all records
         offsets[*prefix] = offset + records.len() * record_size; // Increment by the number of bytes written
     }
-
     writer.flush()?;
     Ok(())
 }

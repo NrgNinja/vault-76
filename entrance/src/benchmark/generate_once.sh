@@ -3,6 +3,7 @@
 k="$1"
 threads="$2"
 memory="$3"
+hash_size="$4"
 
 # Specify the output directory
 output_dir="../../output"
@@ -19,7 +20,7 @@ sudo sync
 # sar -r 1 >../../stats/memory/memory-stats_$k$threads.txt &
 # sleep 5
 
-./../../target/release/entrance -k $k -t $threads -s -m $memory -d -p 100
+./../../target/release/entrance -k $k -t $threads -s -m $memory -d -p 100 -h $hash_size
 # 17179869184
 # 2147483648
 # dd if=/dev/urandom of=newfile bs=1M count=1024

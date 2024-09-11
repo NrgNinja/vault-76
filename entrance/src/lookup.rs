@@ -9,7 +9,7 @@ use crate::print_records::{hash_to_string, nonce_to_decimal};
 
 const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 
-pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
+pub fn lookup_by_prefix(filename: &str, prefix: &str, hash_size: usize) -> io::Result<()> {
     let path = PathBuf::from(OUTPUT_FOLDER).join(filename);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
@@ -21,7 +21,7 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
     let num_records = total_size / RECORD_SIZE;
 
     let start_time = Instant::now();
-    let (records, seek_count) = binary_search_by_prefix(&mut reader, num_records, prefix)?;
+    let (records, seek_count) = binary_search_by_prefix(&mut reader, num_records, prefix, hash_size)?;
     let duration = start_time.elapsed();
 
     if !records.is_empty() {
@@ -29,7 +29,7 @@ pub fn lookup_by_prefix(filename: &str, prefix: &str) -> io::Result<()> {
         println!("{}", "-".repeat(88));
         for record in records {
             let nonce_decimal = nonce_to_decimal(&record.nonce);
-            let hash_hex = hash_to_string(&record.hash);
+            let hash_hex = hash_to_string(&record.hash, hash_size);
             println!("{:<16} | {}", nonce_decimal, hash_hex);
         }
     } else {
@@ -47,6 +47,7 @@ fn binary_search_by_prefix<R: Read + Seek>(
     reader: &mut R,
     num_records: usize,
     prefix: &str,
+    hash_size: usize
 ) -> io::Result<(Vec<Record>, usize)> {
     let mut low = 0;
     let mut high = num_records as isize - 1;
@@ -59,7 +60,7 @@ fn binary_search_by_prefix<R: Read + Seek>(
         seek_count += 1;
 
         if let Some(record) = deserialize_next_record(reader)? {
-            let hash_hex = hash_to_string(&record.hash);
+            let hash_hex = hash_to_string(&record.hash, hash_size);
             if hash_hex.starts_with(prefix) {
                 records.push(record);
                 collect_records(
@@ -70,6 +71,7 @@ fn binary_search_by_prefix<R: Read + Seek>(
                     true,
                     &mut records,
                     &mut seek_count,
+                    hash_size,
                 )?;
                 collect_records(
                     reader,
@@ -79,6 +81,7 @@ fn binary_search_by_prefix<R: Read + Seek>(
                     false,
                     &mut records,
                     &mut seek_count,
+                    hash_size,
                 )?;
                 break;
             } else if hash_hex < prefix.to_owned() {
@@ -100,13 +103,14 @@ fn collect_records<R: Read + Seek>(
     forward: bool,
     records: &mut Vec<Record>,
     seek_count: &mut usize,
+    hash_size: usize,
 ) -> io::Result<()> {
     let mut current = start;
     while (forward && current < end as isize) || (!forward && current >= 0) {
         reader.seek(SeekFrom::Start((current as usize * RECORD_SIZE) as u64))?;
         *seek_count += 1;
         if let Some(record) = deserialize_next_record(reader)? {
-            let hash_hex = hash_to_string(&record.hash);
+            let hash_hex = hash_to_string(&record.hash, hash_size);
             if hash_hex.starts_with(prefix) {
                 if forward {
                     records.push(record);

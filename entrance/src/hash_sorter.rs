@@ -3,13 +3,14 @@ use std::{
     sync::RwLock,
 };
 
-use crate::{NONCE_SIZE, RECORD_SIZE};
+use crate::{NONCE_SIZE};
 
 pub fn sort_hashes(
     path: &String,
     bucket_index: usize,
     bucket_size: usize,
     offsets: &RwLock<Vec<usize>>,
+    record_size: usize,
 ) {
     let offsets = offsets.read().unwrap(); // Acquire write lock on offsets
 
@@ -20,7 +21,7 @@ pub fn sort_hashes(
         .expect("Error opening file");
 
     let start = offsets[bucket_index] as u64;
-    let end = start + (bucket_size * RECORD_SIZE) as u64;
+    let end = start + (bucket_size * record_size) as u64;
 
     let mut reader = BufReader::new(&file);
     reader
@@ -28,7 +29,7 @@ pub fn sort_hashes(
         .expect("Error seeking to start of bucket");
 
     let mut bucket_records = Vec::with_capacity(bucket_size);
-    let mut buffer = [0; RECORD_SIZE];
+    let mut buffer = vec![0; record_size];
 
     while reader
         .stream_position()

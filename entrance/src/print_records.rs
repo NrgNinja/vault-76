@@ -1,5 +1,5 @@
 // this file prints records specified by the command line flag: -p
-use crate::{Record, HASH_SIZE, OUTPUT_FOLDER};
+use crate::{Record, OUTPUT_FOLDER};
 use bincode::deserialize_from;
 use std::fs::File;
 use std::io::{self, BufReader};
@@ -10,15 +10,16 @@ pub fn nonce_to_decimal(nonce: &[u8; 6]) -> u64 {
 }
 
 // converts hash from byte array to a hexadecimal string
-pub fn hash_to_string(hash: &Vec<u8>) -> String {
+pub fn hash_to_string(hash: &Vec<u8>, hash_size: usize) -> String {
     hash.iter()
+        .take(hash_size)
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<String>>()
         .join("")
 }
 
 // this function reads the records from the output file, deserializes them and then prints them
-pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
+pub fn print_records_from_file(num_records_print: u64, hash_size: usize) -> io::Result<()> {
     let path = format!("{}/output.bin", OUTPUT_FOLDER);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
@@ -39,7 +40,7 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
                 //     .map(|b| format!("{:08b}", b))
                 //     .collect::<Vec<String>>()
                 //     .join("");
-                let hash_hex = hash_to_string(&record.hash);
+                let hash_hex = hash_to_string(&record.hash, hash_size);
 
                 let mut prefix = 0u64;
                 let mut bits_processed = 0;
@@ -60,18 +61,21 @@ pub fn print_records_from_file(num_records_print: u64) -> io::Result<()> {
                 println!("{:<16} | {} | {}", nonce_decimal, hash_hex, prefix);
                 counter += 1;
             }
-            Err(_) => break,
+            Err(e) => {
+                println!("Error desearializing record: {}", e);
+                break;
+            },
         }
     }
     Ok(())
 }
 
-pub fn verify_records_sorted(expected_count: usize) -> io::Result<()> {
+pub fn verify_records_sorted(expected_count: usize, hash_size: usize) -> io::Result<()> {
     let path = format!("{}/output.bin", OUTPUT_FOLDER);
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
-    let mut last_hash = vec![0u8; HASH_SIZE]; // Initially the smallest possible hash
+    let mut last_hash = vec![0u8; hash_size]; // Initially the smallest possible hash
     let mut is_first = true;
     let mut record_count = 0;
 
@@ -93,7 +97,10 @@ pub fn verify_records_sorted(expected_count: usize) -> io::Result<()> {
                     last_hash = record.hash.to_vec();
                 }
             }
-            Err(_) => break,
+            Err(e) => {
+                println!("Error deserializing record: {}", e);
+                break;
+            },
         }
     }
 

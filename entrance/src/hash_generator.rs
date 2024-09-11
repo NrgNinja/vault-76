@@ -11,31 +11,36 @@ pub fn generate_hash(nonce: u64, prefix_length: usize, hash_size: usize) -> (u64
     let mut hasher = Hasher::new();
     hasher.update(&nonce_bytes[2..8]); // extract the lower 6 bytes as u8 array
     let hash = hasher.finalize();
-    let hash_bytes = hash.as_bytes();
+    let hash_bytes = hash.as_bytes().to_vec();
+    let truncated_hash = hash_bytes[0..hash_size].to_vec();
 
-    // prefix of desired length is extracted using bitshifting from left to right
-    let mut prefix = 0u64;
-    let mut bits_processed = 0;
-
-    for &byte in hash_bytes {
-        let bits_to_take = (prefix_length - bits_processed).min(8); // calculates the number of bits to take from the current hash byte (goal is to take the entire prefix_length, but we cannot take more than 8 bits at a time = 1 byte)
-        prefix <<= bits_to_take; // shift current prefix value to the left by bits_to_take bits
-        prefix |= (byte >> (8 - bits_to_take)) as u64;
-        bits_processed += bits_to_take;
-
-        if bits_processed >= prefix_length {
-            break;
-        }
-    }
-
-    prefix &= (1u64 << prefix_length) - 1;
+    let prefix = calculate_prefix(&truncated_hash, prefix_length);
 
     // return a tuple containing our extracted prefix and the Record of each nonce/hash pair
     (
         prefix,
         Record {
             nonce: nonce_bytes[2..8].try_into().unwrap(),
-            hash: hash_bytes[0..hash_size].try_into().unwrap(),
+            hash: truncated_hash,
         },
     )
+}
+
+fn calculate_prefix(truncated_hash: &Vec<u8>, prefix_length: usize) -> u64 {
+        // prefix of desired length is extracted using bitshifting from left to right
+        let mut prefix = 0u64;
+        let mut bits_processed = 0;
+    
+        for &byte in truncated_hash {
+            let bits_to_take = (prefix_length - bits_processed).min(8); // calculates the number of bits to take from the current hash byte (goal is to take the entire prefix_length, but we cannot take more than 8 bits at a time = 1 byte)
+            prefix <<= bits_to_take; // shift current prefix value to the left by bits_to_take bits
+            prefix |= (byte >> (8 - bits_to_take)) as u64;
+            bits_processed += bits_to_take;
+    
+            if bits_processed >= prefix_length {
+                break;
+            }
+        }
+    
+        prefix &= (1u64 << prefix_length) - 1;
 }

@@ -17,8 +17,8 @@ mod print_records;
 mod progress_tracker;
 mod store_hashes;
 
-const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
-const HASH_SIZE: usize = 26;
+// const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
+// const HASH_SIZE: usize = 26;
 const NONCE_SIZE: usize = 6;
 const OUTPUT_FOLDER: &str = "../../output";
 
@@ -32,98 +32,90 @@ struct Record {
 fn main() {
     // defines letters for arguments that the user can call from command line
     let matches = App::new("Vault-76")
-        .version("3.0")
-        .about("Cryptographic hash tool that generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a DashMap, by using a specified prefix as the key, and the record as a value. You can also look up records efficiently.")
-        .arg(
-            Arg::with_name("k-value")
-                .short('k') // you can change this flag
-                .long("k-value")
-                .takes_value(true) // there must be a number inputted
-                .help("Specify k value to compute 2^k nonces"),
-        )
-        .arg(
-            Arg::with_name("print")
-                .short('p')
-                .long("print")
-                .takes_value(true)
-                .help("Number of records to print"),
-        )
-        .arg(
-            Arg::with_name("threads")
-                .short('t')
-                .long("threads")
-                .takes_value(true)
-                .default_value("1") 
-                .help("Number of threads to use for hash generation"),
-        )
-        .arg(
-            Arg::with_name("file_size")
-                .short('f')
-                .long("file_size")
-                .takes_value(true)
-                .default_value("0")
-                .help("File size to be populated with hashes"),
-        )
-        .arg(
-            Arg::with_name("memory_size")
-                .short('m')
-                .long("memory_size")
-                .takes_value(true)
-                .help("How much memory you want to limit for the vault to use (in MB)"),
-        )
-        .arg(
-            Arg::with_name("prefix_length")
-                .short('x')
-                .long("prefix")
-                .takes_value(true)
-                .help("Specify the prefix length to extract from the hash"),
-        )
-        .arg(
-            Arg::with_name("verify")
-                .short('v')
-                .long("verify")
-                .takes_value(false)  // automatically true if used, false otherwise
-                .help("Verify that the hashes in the output file are in sorted order"),
-        )
-        .arg(
-            Arg::with_name("sorting_on")
-                .short('s')
-                .long("sorting_on")
-                .takes_value(false)
-                .help("Turn sorting on/off"),
-        )
-        .arg(
-            Arg::with_name("lookup")
-                .short('l')
-                .long("lookup")
-                .takes_value(true)
-                .help("Lookup a record by a prefix"),
+            .version("3.0")
+            .about("Cryptographic hash tool that generates hashes for unique nonces using BLAKE3 hashing function. This vault also has the ability to store each record (nonce/hash pair) into a DashMap, by using a specified prefix as the key, and the record as a value. You can also look up records efficiently.")
+            .arg(
+                Arg::with_name("k-value")
+                    .short('k') // you can change this flag
+                    .long("k-value")
+                    .takes_value(true) // there must be a number inputted
+                    .help("Specify k value to compute 2^k nonces"),
             )
-        .arg(
-            Arg::with_name("debug")
-                .short('d')
-                .long("debug")
-                .takes_value(false)
-                .help("Prints debug information to the command line")
+            .arg(
+                Arg::with_name("print")
+                    .short('p')
+                    .long("print")
+                    .takes_value(true)
+                    .help("Number of records to print"),
             )
-        .arg(
-            Arg::with_name("hash_size")
-                .short('h')
-                .long("hash_size")
-                .takes_value(true)
-                .help("Specify the size of the hash"),
-        )
-        .get_matches();
+            .arg(
+                Arg::with_name("threads")
+                    .short('t')
+                    .long("threads")
+                    .takes_value(true)
+                    .default_value("1") 
+                    .help("Number of threads to use for hash generation"),
+            )
+            .arg(
+                Arg::with_name("file_size")
+                    .short('f')
+                    .long("file_size")
+                    .takes_value(true)
+                    .default_value("0")
+                    .help("File size to be populated with hashes"),
+            )
+            .arg(
+                Arg::with_name("memory_size")
+                    .short('m')
+                    .long("memory_size")
+                    .takes_value(true)
+                    .help("How much memory you want to limit for the vault to use (in MB)"),
+            )
+            .arg(
+                Arg::with_name("prefix_length")
+                    .short('x')
+                    .long("prefix")
+                    .takes_value(true)
+                    .help("Specify the prefix length to extract from the hash"),
+            )
+            .arg(
+                Arg::with_name("verify")
+                    .short('v')
+                    .long("verify")
+                    .takes_value(false)  // automatically true if used, false otherwise
+                    .help("Verify that the hashes in the output file are in sorted order"),
+            )
+            .arg(
+                Arg::with_name("sorting_on")
+                    .short('s')
+                    .long("sorting_on")
+                    .takes_value(false)
+                    .help("Turn sorting on/off"),
+            )
+            .arg(
+                Arg::with_name("lookup")
+                    .short('l')
+                    .long("lookup")
+                    .takes_value(true)
+                    .help("Lookup a record by a prefix"),
+                )
+            .arg(
+                Arg::with_name("debug")
+                    .short('d')
+                    .long("debug")
+                    .takes_value(false)
+                    .help("Prints debug information to the command line")
+                )
+            .arg(
+                Arg::with_name("hash_size")
+                    .short('h')
+                    .long("hash_size")
+                    .takes_value(true)
+                    .help("Specify the size of the hash"),
+            )
+            .get_matches();
 
     let output_file = "output.bin";
-
-    // determine if lookup is specified, otherwise continue normal vault operations
-    if let Some(lookup_value) = matches.value_of("lookup") {
-        if let Err(e) = lookup::lookup_by_prefix(output_file, lookup_value) {
-            eprintln!("Error during lookup: {}", e);
-        }
-        return;
-    }
 
     let k = matches
         .value_of("k-value")
@@ -147,7 +139,7 @@ fn main() {
 
     let mut memory_size = matches
         .value_of("memory_size")
-        .unwrap_or("2048") // 2048 MB or 2 GB 
+        .unwrap_or("2048") // 2048 MB or 2 GB
         .parse::<usize>()
         .expect("Please provide a valid number for memory_size");
 
@@ -169,12 +161,20 @@ fn main() {
         .parse::<usize>()
         .expect("Please provide a valid number for hash_size");
 
+    // determine if lookup is specified, otherwise continue normal vault operations
+    if let Some(lookup_value) = matches.value_of("lookup") {
+        if let Err(e) = lookup::lookup_by_prefix(output_file, lookup_value, hash_size) {
+            eprintln!("Error during lookup: {}", e);
+        }
+        return;
+    }
+
     // libary to use multiple threads
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
         .unwrap();
-    
+
     let record_size = NONCE_SIZE + hash_size;
 
     // if -f flag is not provided, calculate file size based on k value
@@ -182,9 +182,11 @@ fn main() {
         file_size = num_records * record_size;
         // in bytes
     }
+    println!("file_size: {}", file_size);
+    println!("num_records: {}", num_records);
 
     // convert memory_size into bytes
-    memory_size = memory_size * 1024 * 1024; 
+    memory_size = memory_size * 1024 * 1024;
 
     // if memory_size is bigger than the file size of the hashes, set memory_size to file_size
     memory_size = if memory_size > file_size {
@@ -194,6 +196,7 @@ fn main() {
     };
 
     let ratio = ((file_size as f64) / (memory_size as f64)).ceil() as usize;
+    println!("ratio: {}", ratio);
     let mut write_size = 1024 * 1024 / ratio;
     let mut flush_size;
     let mut bucket_size = 0;
@@ -205,14 +208,24 @@ fn main() {
     // looking for optimal combination of prefix length, num of buckets, memory bucket size, and disk bucket size
     while write_size > 0 {
         flush_size = ratio;
+        println!("write_size: {}", write_size);
+        println!("flush_size: {}", flush_size);
         bucket_size = write_size * 1024 * flush_size;
+        println!("bucket_size: {}", bucket_size);
         num_buckets = file_size / bucket_size;
+        println!("num_buckets: {}", num_buckets);
         prefix_size = (num_buckets as f64).log(2.0).ceil() as u32 + 1;
+        println!("prefix_size: {}", prefix_size);
         num_buckets = 2usize.pow(prefix_size as u32);
+        println!("num_buckets: {}", num_buckets);
         prefix_size = (num_buckets as f64).log(2.0).ceil() as u32;
+        println!("prefix_size: {}", prefix_size);
         bucket_size = file_size / num_buckets; // disk bucket size (in bytes)
+        println!("bucket_size: {}", bucket_size);
         expected_total_flushes = file_size / write_size;
+        println!("expected_total_flushes: {}", expected_total_flushes);
         sort_memory = bucket_size * num_threads;
+        println!("sort_memory: {}", sort_memory);
 
         // valid configuration
         if sort_memory <= memory_size && num_buckets >= 64 {
@@ -220,16 +233,28 @@ fn main() {
                 println!("-----------------Found valid config------------------");
             }
             write_size = memory_size / num_buckets;
+            println!("write_size: {}", write_size);
             write_size = (write_size / 16) * 16;
+            println!("write_size: {}", write_size);
             bucket_size = write_size * flush_size;
+            println!("bucket_size: {}", bucket_size);
             memory_size = write_size * num_buckets;
+            println!("memory_size: {}", memory_size);
             file_size = bucket_size * num_buckets;
+            println!("file_size: {}", file_size);
             sort_memory = bucket_size * num_threads;
+            println!("sort_memory: {}", sort_memory);
             num_records = file_size / record_size;
+            println!("num_records: {}", num_records);
             expected_total_flushes = file_size / write_size;
+            println!("expected_total_flushes: {}", expected_total_flushes);
             bucket_size = write_size * flush_size / record_size;
+            println!("bucket_size: {}", bucket_size);
+
+            println!("-----------------Final Config------------------");
 
             if debug {
+                println!("Hash size: {}", hash_size);
                 println!(
                     "Memory size: {} bytes ({} GB)",
                     memory_size,
@@ -276,6 +301,7 @@ fn main() {
             num_records as u64,
             expected_total_flushes,
             Duration::from_secs(2),
+            record_size,
         ))
     } else {
         None
@@ -314,8 +340,9 @@ fn main() {
                 }
             }
             while local_size < thread_memory_limit {
-                let (prefix, record) = hash_generator::generate_hash(nonce, prefix_size as usize, hash_size);
-
+                let (prefix, record) =
+                    hash_generator::generate_hash(nonce, prefix_size as usize, hash_size);
+                
                 nonce += 1;
 
                 let mut records = map.entry(prefix as usize).or_insert_with(|| Vec::new());
@@ -326,6 +353,7 @@ fn main() {
                 records.push(record);
                 local_size += record_size;
             }
+
             // completed a batch of records processed
             if debug {
                 if let Some(ref tracker) = tracker {
@@ -379,7 +407,13 @@ fn main() {
 
         // parallel processing of each bucket using rayon
         (0..num_buckets).into_par_iter().for_each(|bucket_index| {
-            hash_sorter::sort_hashes(&path, bucket_index, bucket_size, &offsets_vector);
+            hash_sorter::sort_hashes(
+                &path,
+                bucket_index,
+                bucket_size,
+                &offsets_vector,
+                record_size,
+            );
             if debug {
                 if let Some(ref tracker) = tracker {
                     tracker.update_records_processed(records_per_bucket);
@@ -436,14 +470,14 @@ fn main() {
     }
 
     if num_records_to_print != 0 {
-        match print_records::print_records_from_file(num_records_to_print) {
+        match print_records::print_records_from_file(num_records_to_print, hash_size) {
             Ok(_) => println!("Hashes successfully deserialized from {}", output_file),
             Err(e) => eprintln!("Error deserializing hashes: {}", e),
         }
     }
 
     if verify {
-        match print_records::verify_records_sorted(num_records) {
+        match print_records::verify_records_sorted(num_records, hash_size) {
             Ok(_) => println!("Verification successful."),
             Err(e) => println!("Verification failed: {}", e),
         }

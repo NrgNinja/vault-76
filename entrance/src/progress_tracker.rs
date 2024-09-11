@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
+// const RECORD_SIZE: usize = 32; // 6 bytes for nonce + 26 bytes for hash
 
 pub struct ProgressTracker {
     start_time: Instant,
@@ -25,6 +25,7 @@ impl ProgressTracker {
         total_records: u64,
         expected_flushes: usize,
         update_interval: Duration,
+        record_size: usize,
     ) -> Arc<Self> {
         let tracker = Arc::new(Self {
             start_time: Instant::now(),
@@ -38,7 +39,7 @@ impl ProgressTracker {
             flushes_completed: AtomicUsize::new(0), // Initialize as zero
             expected_total_flushes: AtomicUsize::new(expected_flushes),
         });
-        tracker.clone().start_progress_thread();
+        tracker.clone().start_progress_thread(record_size);
         tracker
     }
 
@@ -60,7 +61,7 @@ impl ProgressTracker {
     }
 
     // this one outputs the large throughput numbers
-    fn start_progress_thread(self: Arc<Self>) {
+    fn start_progress_thread(self: Arc<Self>, record_size: usize) {
         let interval = self.update_interval;
         let total_records = self.total_records;
         let current_stage = self.current_stage.clone();
@@ -88,7 +89,7 @@ impl ProgressTracker {
 
                 let bytes_processed = (now_processed - *last_processed_count.lock().unwrap())
                     as f64
-                    * RECORD_SIZE as f64;
+                    * record_size as f64;
                 let throughput = bytes_processed / (1024.0 * 1024.0) / elapsed;
 
                 // check if the current progress, ETA, or throughput is different from the last logged values
