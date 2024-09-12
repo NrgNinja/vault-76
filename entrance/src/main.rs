@@ -138,9 +138,9 @@ fn main() {
         .parse::<u64>()
         .expect("Please provide a valid number of records to print");
 
-    let mut memory_size = matches
+    let mut memory_size = matches // in MB
         .value_of("memory_limit")
-        .unwrap_or("2147483648")
+        .unwrap_or("2048")
         .parse::<usize>()
         .expect("Please provide a valid number for memory_limit");
 
@@ -171,6 +171,9 @@ fn main() {
         file_size = num_records * RECORD_SIZE;
         // in bytes
     }
+
+    // convert memory_size from MB to bytes
+    memory_size *= 1024 * 1024;
 
     // if memory_size is bigger than the file size of the hashes, set memory_size to file_size
     memory_size = if memory_size > file_size {
